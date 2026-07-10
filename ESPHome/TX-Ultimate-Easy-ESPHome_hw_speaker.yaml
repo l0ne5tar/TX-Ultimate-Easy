@@ -15,21 +15,6 @@ substitutions:
   # RTTTL format: name:d=duration,o=octave,b=tempo:notes
   # d=32 (32nd note), o=5 (octave 5), b=100 (tempo 100)
   tone_volume_change: "scale_up:d=32,o=5,b=100:c,c#,d#,e,f#,g#,a#,b"  # Use "none" to disable sound
-  rtttl_scale_up: "scale_up:d=32,o=5,b=100:c,c#,d#,e,f#,g#,a#,b"
-  rtttl_scale_down: "scale_down:d=32,o=5,b=100:b,a#,g#,f#,e,d#,c#,c"
-  rtttl_power_up: "power_up:d=8,o=5,b=120:g#,e,g#,e"
-  rtttl_power_down: "power_down:d=8,o=5,b=120:e,g#,e,g#"
-  rtttl_notification: "notification:d=16,o=5,b=200:g,c6,e6,c6,g"
-  rtttl_chirp: "chirp:d=32,o=6,b=240:g,e,g,e"
-  rtttl_beep: "beep:d=4,o=5,b=240:a5"
-  rtttl_ascending: "ascending:d=16,o=5,b=200:c,d,e,f,g,a,b,c6"
-  rtttl_descending: "descending:d=16,o=6,b=200:c6,b,a,g,f,e,d,c"
-  rtttl_triplet: "triplet:d=16,o=5,b=240:e,g,c6"
-  rtttl_triplet_down: "triplet_down:d=16,o=6,b=240:c6,g,e"
-  rtttl_fanfare: "fanfare:d=8,o=5,b=200:g,c6,e6,g6"
-  rtttl_twinkle: "twinkle:d=8,o=5,b=200:c,c,g,g,a,a,g"
-  rtttl_ding_dong: "ding_dong:d=4,o=5,b=200:e5,c5"
-  rtttl_buzzer: "buzzer:d=8,o=5,b=240:a5,a5,a5,a5,a5"
   short_click_sound_data: [
     0x01, 0x02, 0x04, 0x06, 0x07, 0x08, 0x08, 0x06, 0x01, 0xFA, 0xF4, 0xEF, 0xEE, 0xF1, 0xF7, 0xFF,
     0x07, 0x0E, 0x11, 0x11, 0x10, 0x0C, 0x06, 0xFF, 0xF8, 0xF1, 0xEC, 0xEA, 0xEC, 0xF2, 0xF9, 0xFF,
@@ -237,6 +222,52 @@ tx_ultimate_easy:
         base_freq: 800
         voices: [0]
         gain: 0.6
+    tunes:
+      - id: scale_up
+        name: "Scale Up"
+        rtttl: "scale_up:d=32,o=5,b=100:c,c#,d#,e,f#,g#,a#,b"
+      - id: scale_down
+        name: "Scale Down"
+        rtttl: "scale_down:d=32,o=5,b=100:b,a#,g#,f#,e,d#,c#,c"
+      - id: power_up
+        name: "Power Up"
+        rtttl: "power_up:d=8,o=5,b=120:g#,e,g#,e"
+      - id: power_down
+        name: "Power Down"
+        rtttl: "power_down:d=8,o=5,b=120:e,g#,e,g#"
+      - id: notification
+        name: "Notification"
+        rtttl: "notification:d=16,o=5,b=200:g,c6,e6,c6,g"
+      - id: chirp
+        name: "Chirp"
+        rtttl: "chirp:d=32,o=6,b=240:g,e,g,e"
+      - id: beep
+        name: "Beep"
+        rtttl: "beep:d=4,o=5,b=240:a5"
+      - id: ascending
+        name: "Ascending"
+        rtttl: "ascending:d=16,o=5,b=200:c,d,e,f,g,a,b,c6"
+      - id: descending
+        name: "Descending"
+        rtttl: "descending:d=16,o=6,b=200:c6,b,a,g,f,e,d,c"
+      - id: triplet
+        name: "Triplet"
+        rtttl: "triplet:d=16,o=5,b=240:e,g,c6"
+      - id: triplet_down
+        name: "Triplet Down"
+        rtttl: "triplet_down:d=16,o=6,b=240:c6,g,e"
+      - id: fanfare
+        name: "Fanfare"
+        rtttl: "fanfare:d=8,o=5,b=200:g,c6,e6,g6"
+      - id: twinkle
+        name: "Twinkle"
+        rtttl: "twinkle:d=8,o=5,b=200:c,c,g,g,a,a,g"
+      - id: ding_dong
+        name: "Ding Dong"
+        rtttl: "ding_dong:d=4,o=5,b=200:e5,c5"
+      - id: buzzer
+        name: "Buzzer"
+        rtttl: "buzzer:d=8,o=5,b=240:a5,a5,a5,a5,a5"
 
 packages:
   hw_audio: !include TX-Ultimate-Easy-ESPHome_hw_audio.yaml
@@ -255,7 +286,9 @@ api:
               ESP_LOGI("${TAG_HW_SPEAKER}", "Play tone: '%s'", tone.c_str());
               esphome::tx_ultimate_easy::RtttlSynth::play_rtttl(
                 id(speaker_embedded),
-                esphome::tx_ultimate_easy::rtttl_synth_instruments[0],
+                esphome::tx_ultimate_easy::rtttl_synth_instruments[
+                  esphome::tx_ultimate_easy::RtttlSynth::instrument_index(
+                    id(sl_rtttl_default_instrument)->current_option())],
                 tone.c_str());
             }
 
@@ -404,26 +437,20 @@ script:
           std::string user2 = id(tx_rtttl_custom_2)->state;
 
           const char *rtttl_str = nullptr;
-          if (sound == "Scale Up") { rtttl_str = "${rtttl_scale_up}"; }
-          else if (sound == "Scale Down") { rtttl_str = "${rtttl_scale_down}"; }
-          else if (sound == "Power Up") { rtttl_str = "${rtttl_power_up}"; }
-          else if (sound == "Power Down") { rtttl_str = "${rtttl_power_down}"; }
-          else if (sound == "Notification") { rtttl_str = "${rtttl_notification}"; }
-          else if (sound == "Chirp") { rtttl_str = "${rtttl_chirp}"; }
-          else if (sound == "Beep") { rtttl_str = "${rtttl_beep}"; }
-          else if (sound == "Ascending") { rtttl_str = "${rtttl_ascending}"; }
-          else if (sound == "Descending") { rtttl_str = "${rtttl_descending}"; }
-          else if (sound == "Triplet") { rtttl_str = "${rtttl_triplet}"; }
-          else if (sound == "Triplet Down") { rtttl_str = "${rtttl_triplet_down}"; }
-          else if (sound == "Fanfare") { rtttl_str = "${rtttl_fanfare}"; }
-          else if (sound == "Twinkle") { rtttl_str = "${rtttl_twinkle}"; }
-          else if (sound == "Ding Dong") { rtttl_str = "${rtttl_ding_dong}"; }
-          else if (sound == "Buzzer") { rtttl_str = "${rtttl_buzzer}"; }
-          else if (sound == "User Defined 1") { rtttl_str = user1.c_str(); }
-          else if (sound == "User Defined 2") { rtttl_str = user2.c_str(); }
-
+          for (auto &t : esphome::tx_ultimate_easy::rtttl_synth_tunes) {
+            if (sound == t.name) {
+              rtttl_str = t.rtttl;
+              break;
+            }
+          }
           if (rtttl_str && rtttl_str[0]) {
             esphome::tx_ultimate_easy::RtttlSynth::play_rtttl(spk, inst, rtttl_str);
+          }
+          if (sound == "User Defined 1" && !user1.empty()) {
+            esphome::tx_ultimate_easy::RtttlSynth::play_rtttl(spk, inst, user1.c_str());
+          }
+          if (sound == "User Defined 2" && !user2.empty()) {
+            esphome::tx_ultimate_easy::RtttlSynth::play_rtttl(spk, inst, user2.c_str());
           }
 
   - id: speaker_setup

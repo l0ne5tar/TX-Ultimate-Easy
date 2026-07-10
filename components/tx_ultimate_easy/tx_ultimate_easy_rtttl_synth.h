@@ -468,12 +468,9 @@ inline void RtttlSynth::play_8bit(speaker::Speaker *spk, const std::vector<uint8
 }
 
 inline int RtttlSynth::instrument_index(const std::string &name) {
-  if (name == "Bell") return 1;
-  if (name == "Organ") return 2;
-  if (name == "Piano") return 3;
-  if (name == "Chime") return 4;
-  if (name == "Synth") return 5;
-  if (name == "Alarm") return 6;
+  for (size_t i = 0; i < rtttl_synth_instrument_count; i++) {
+    if (name == rtttl_synth_instruments[i].name) return static_cast<int>(i);
+  }
   return 0;  // Gameboy
 }
 

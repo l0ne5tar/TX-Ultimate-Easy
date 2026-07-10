@@ -141,6 +141,7 @@ INSTRUMENT_SCHEMA = cv.Schema({
 TUNE_SCHEMA = cv.Schema({
     cv.Required("id"): cv.string_strict,
     cv.Required("rtttl"): cv.string,
+    cv.Optional("name"): cv.string,
 })
 
 RTTTL_SYNTH_SCHEMA = cv.Schema({
@@ -246,7 +247,7 @@ async def register_tx_ultimate_easy(var, config):
         )
 
 def generate_rtttl_synth_code(config):
-    """Generate C++ header file for RTTTL synth instruments."""
+    """Generate C++ header file for RTTTL synth instruments and tunes."""
     rtttl_synth = config.get(CONF_RTTTL_SYNTH, {})
     comp_dir = os.path.dirname(os.path.realpath(__file__))
     output_path = os.path.join(comp_dir, "rtttl_synth_data.h")
@@ -258,6 +259,7 @@ def generate_rtttl_synth_code(config):
 
     envelopes = rtttl_synth.get(CONF_ENVELOPES, [])
     instruments = rtttl_synth.get(CONF_INSTRUMENTS, [])
+    tunes = rtttl_synth.get(CONF_TUNES, [])
     sample_rate = rtttl_synth.get(CONF_SAMPLE_RATE, 16000)
 
     if not instruments:
@@ -337,13 +339,13 @@ def generate_rtttl_synth_code(config):
     lines.append(f"static const int rtttl_synth_sample_rate = {sample_rate};")
 
     # Generate tunes
-    tunes = rtttl_synth.get(CONF_TUNES, [])
     if tunes:
         lines.append("")
         lines.append("static const RtttlSynthTune rtttl_synth_tunes[] = {")
         for tune in tunes:
             rtttl_escaped = tune["rtttl"].replace('"', '\\"')
-            lines.append(f'  {{"{tune["id"]}", "{rtttl_escaped}"}},')
+            name = tune.get("name") or tune["id"].replace("_", " ").title()
+            lines.append(f'  {{"{name}", "{rtttl_escaped}"}},')
         lines.append("};")
         lines.append(f"static const size_t rtttl_synth_tune_count = {len(tunes)};")
         lines.append("")

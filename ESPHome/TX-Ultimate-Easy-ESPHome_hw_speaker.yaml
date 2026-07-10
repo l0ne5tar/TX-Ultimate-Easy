@@ -15,6 +15,21 @@ substitutions:
   # RTTTL format: name:d=duration,o=octave,b=tempo:notes
   # d=32 (32nd note), o=5 (octave 5), b=100 (tempo 100)
   tone_volume_change: "scale_up:d=32,o=5,b=100:c,c#,d#,e,f#,g#,a#,b"  # Use "none" to disable sound
+  rtttl_scale_up: "scale_up:d=32,o=5,b=100:c,c#,d#,e,f#,g#,a#,b"
+  rtttl_scale_down: "scale_down:d=32,o=5,b=100:b,a#,g#,f#,e,d#,c#,c"
+  rtttl_power_up: "power_up:d=8,o=5,b=120:g#,e,g#,e"
+  rtttl_power_down: "power_down:d=8,o=5,b=120:e,g#,e,g#"
+  rtttl_notification: "notification:d=16,o=5,b=200:g,c6,e6,c6,g"
+  rtttl_chirp: "chirp:d=32,o=6,b=240:g,e,g,e"
+  rtttl_beep: "beep:d=4,o=5,b=240:a5"
+  rtttl_ascending: "ascending:d=16,o=5,b=200:c,d,e,f,g,a,b,c6"
+  rtttl_descending: "descending:d=16,o=6,b=200:c6,b,a,g,f,e,d,c"
+  rtttl_triplet: "triplet:d=16,o=5,b=240:e,g,c6"
+  rtttl_triplet_down: "triplet_down:d=16,o=6,b=240:c6,g,e"
+  rtttl_fanfare: "fanfare:d=8,o=5,b=200:g,c6,e6,g6"
+  rtttl_twinkle: "twinkle:d=8,o=5,b=200:c,c,g,g,a,a,g"
+  rtttl_ding_dong: "ding_dong:d=4,o=5,b=200:e5,c5"
+  rtttl_buzzer: "buzzer:d=8,o=5,b=240:a5,a5,a5,a5,a5"
   short_click_sound_data: [
     0x01, 0x02, 0x04, 0x06, 0x07, 0x08, 0x08, 0x06, 0x01, 0xFA, 0xF4, 0xEF, 0xEE, 0xF1, 0xF7, 0xFF,
     0x07, 0x0E, 0x11, 0x11, 0x10, 0x0C, 0x06, 0xFF, 0xF8, 0xF1, 0xEC, 0xEA, 0xEC, 0xF2, 0xF9, 0xFF,
@@ -121,7 +136,107 @@ substitutions:
     0x95, 0xFE, 0xAE, 0xFE, 0xCF, 0xFE, 0xF7, 0xFE, 0x25, 0xFF, 0x58, 0xFF, 0x8F, 0xFF, 0xC7, 0xFF]
   click_sound_data: ${short_click_sound_data}
 
+  click_sound_pcm_data: "{0x01, 0x02, 0x04, 0x06, 0x07, 0x08, 0x08, 0x06, 0x01, 0xFA, 0xF4, 0xEF, 0xEE, 0xF1, 0xF7, 0xFF, 0x07, 0x0E, 0x11, 0x11, 0x10, 0x0C, 0x06, 0xFF, 0xF8, 0xF1, 0xEC, 0xEA, 0xEC, 0xF2, 0xF9, 0xFF, 0x05, 0x0A, 0x10, 0x14, 0x17, 0x17, 0x14, 0x0B, 0xFD, 0xED, 0xE0, 0xD9, 0xDB, 0xE6, 0xF7, 0x0A, 0x19, 0x20, 0x1E, 0x14, 0x05, 0xF4, 0xE5, 0xDF, 0xE4, 0xF4, 0x0C, 0x24, 0x36, 0x3D, 0x35, 0x20, 0xFF, 0xDD, 0xC0, 0xAE, 0xA9, 0xB0, 0xC4, 0xE0, 0x03, 0x26, 0x48, 0x62, 0x70, 0x6D, 0x59, 0x35, 0x08, 0xD8, 0xAC, 0x8D, 0x80, 0x85, 0x9C, 0xC1, 0xF0, 0x21, 0x4E, 0x6F, 0x7F, 0x7A, 0x63, 0x3D, 0x0F, 0xE0, 0xB7, 0x9B, 0x90, 0x96, 0xAC, 0xCE, 0xF6, 0x1D, 0x3C, 0x50, 0x55, 0x4D, 0x3A, 0x20, 0x04, 0xEC, 0xD8, 0xCC, 0xC9, 0xCD, 0xD8, 0xE8, 0xF9, 0x0A, 0x17, 0x1F, 0x20, 0x1C, 0x12, 0x07, 0xFC, 0xF2, 0xEC, 0xEB, 0xED, 0xF3, 0xFA, 0x02, 0x0A, 0x10, 0x12, 0x12, 0x0E, 0x07, 0xFE, 0xF5, 0xED, 0xEA, 0xEB, 0xEF, 0xF7, 0x00, 0x0A, 0x10, 0x13, 0x12, 0x0F, 0x09, 0x02, 0xFB, 0xF5, 0xF3, 0xF2, 0xF3, 0xF6, 0xFB, 0xFF, 0x03, 0x05, 0x07, 0x08, 0x07, 0x05, 0x03, 0x01, 0xFF, 0xFE, 0xFC, 0xFB, 0xFB, 0xFC, 0xFC, 0xFD, 0xFE, 0xFF, 0x00, 0x01, 0x02, 0x02, 0x01, 0x00}"
+
   TAG_HW_SPEAKER: tx_ultimate_easy.hw.speaker
+
+tx_ultimate_easy:
+  # The rtttl_synth config block is read by __init__.py to auto-generate
+  # rtttl_synth_data.h, which defines the rtttl_synth_instruments[] array.
+  # The instrument IDs below become entries in that array at fixed indices
+  # 0-6 (order here determines index).  The C++ helper instrument_index()
+  # maps the display name (e.g. "Bell") to the matching index, so the YAML
+  # "name" strings and the enum/array must stay in sync.
+  # If you add/remove/reorder instruments here, update instrument_index()
+  # in tx_ultimate_easy_rtttl_synth.h to match.
+  rtttl_synth:
+    sample_rate: 16000
+    envelopes:
+      - id: env1
+        attack: 5ms
+        decay: 0ms
+        sustain: 0.6
+        release: 30ms
+      - id: env2
+        attack: 2ms
+        decay: 0ms
+        sustain: 0.2
+        release: 150ms
+      - id: env3
+        attack: 0ms
+        decay: 0ms
+        sustain: 1.0
+        release: 0ms
+      - id: env4
+        attack: 10ms
+        decay: 50ms
+        sustain: 0.8
+        release: 100ms
+      - id: env5
+        attack: 0ms
+        decay: 0ms
+        sustain: 0.5
+        release: 50ms
+    instruments:
+      - id: gameboy
+        waveform: pulse
+        pulse_duty: 0.25
+        envelope: env1
+        note_duration: 60ms
+        base_freq: 1200
+        voices: [0]
+        gain: 0.5
+      - id: bell
+        waveform: sine
+        pulse_duty: 0.5
+        envelope: env2
+        note_duration: 250ms
+        base_freq: 1000
+        voices: [0, 7, -5]
+        gain: 0.35
+      - id: organ
+        waveform: triangle
+        pulse_duty: 0.5
+        envelope: env3
+        note_duration: 80ms
+        base_freq: 500
+        voices: [0, 7]
+        vibrato: true
+        vibrato_depth: 8
+        vibrato_rate: 5
+        gain: 0.5
+      - id: piano
+        waveform: triangle
+        pulse_duty: 0.5
+        envelope: env1
+        note_duration: 80ms
+        base_freq: 600
+        voices: [0, 12, -12]
+        gain: 0.4
+      - id: chime
+        waveform: sine
+        pulse_duty: 0.5
+        envelope: env2
+        note_duration: 300ms
+        base_freq: 1200
+        voices: [0, -5, 7, 12]
+        gain: 0.3
+      - id: synth
+        waveform: pulse
+        pulse_duty: 0.4
+        envelope: env4
+        note_duration: 100ms
+        base_freq: 400
+        voices: [0, -12, 19]
+        gain: 0.4
+      - id: alarm
+        waveform: square
+        pulse_duty: 0.5
+        envelope: env5
+        note_duration: 100ms
+        base_freq: 800
+        voices: [0]
+        gain: 0.6
 
 packages:
   hw_audio: !include TX-Ultimate-Easy-ESPHome_hw_audio.yaml
@@ -136,10 +251,12 @@ api:
         tone: string
       then:
         - lambda: |-
-            rtttl_speaker->stop();
-            if (speaker_volume->state > 0) {
+            if (id(speaker_volume)->state > 0) {
               ESP_LOGI("${TAG_HW_SPEAKER}", "Play tone: '%s'", tone.c_str());
-              rtttl_speaker->play(tone.c_str());
+              esphome::tx_ultimate_easy::RtttlSynth::play_rtttl(
+                id(speaker_embedded),
+                esphome::tx_ultimate_easy::rtttl_synth_instruments[0],
+                tone.c_str());
             }
 
 esphome:
@@ -165,15 +282,41 @@ number:
     set_action:
       then:
         - lambda: |-
-            speaker_embedded->set_volume(x/100.0f);
+            id(speaker_embedded)->set_volume(x/100.0f);
             static const std::string tone_volume_change = "${tone_volume_change}";
-            // Play sound if tone_volume_change is not "none"
             if (x > 0 and !tone_volume_change.empty() and tone_volume_change != "none")
-              rtttl_speaker->play(tone_volume_change);
+              esphome::tx_ultimate_easy::RtttlSynth::play_rtttl(
+                id(speaker_embedded),
+                esphome::tx_ultimate_easy::rtttl_synth_instruments[
+                  esphome::tx_ultimate_easy::RtttlSynth::instrument_index(
+                    id(sl_rtttl_default_instrument)->current_option())],
+                tone_volume_change);
 
-rtttl:
-  - id: rtttl_speaker
-    speaker: speaker_embedded
+globals:
+  - id: last_play_relay_on_ms
+    type: unsigned long
+    initial_value: '0'
+  - id: last_play_relay_off_ms
+    type: unsigned long
+    initial_value: '0'
+
+switch:
+  - id: sw_rtttl_enabled
+    name: Speaker - RTTTL enabled
+    platform: template
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_ON
+    entity_category: config
+    icon: mdi:music-note
+
+  - id: sw_rtttl_synth
+    name: Speaker - RTTTL synth
+    platform: template
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_ON
+    entity_category: config
+    icon: mdi:piano
+    disabled_by_default: true
 
 script:
   - id: !extend boot_done
@@ -213,20 +356,88 @@ script:
                 id: speaker_embedded
                 data: ${click_sound_data}
 
+  - id: play_relay_on
+    mode: restart
+    then:
+      - lambda: |-
+          unsigned long now = millis();
+          if (now - id(last_play_relay_on_ms) < 300) { return; }
+          id(last_play_relay_on_ms) = now;
+          if (!id(sw_rtttl_enabled)->state) return;
+      - script.execute:
+          id: play_rtttl_effect
+          sound: !lambda 'return id(sl_relay_on_sound)->current_option();'
+          instrument: !lambda 'return id(sl_relay_on_instrument)->current_option();'
+
+  - id: play_relay_off
+    mode: restart
+    then:
+      - lambda: |-
+          unsigned long now = millis();
+          if (now - id(last_play_relay_off_ms) < 300) { return; }
+          id(last_play_relay_off_ms) = now;
+          if (!id(sw_rtttl_enabled)->state) return;
+      - script.execute:
+          id: play_rtttl_effect
+          sound: !lambda 'return id(sl_relay_off_sound)->current_option();'
+          instrument: !lambda 'return id(sl_relay_off_instrument)->current_option();'
+
+  - id: play_rtttl_effect
+    parameters:
+      sound: string
+      instrument: string
+    mode: restart
+    then:
+      - lambda: |-
+          if (sound == "Off") return;
+          auto *spk = id(speaker_embedded);
+          int idx = esphome::tx_ultimate_easy::RtttlSynth::instrument_index(instrument);
+          const auto &inst = esphome::tx_ultimate_easy::rtttl_synth_instruments[idx];
+
+          if (sound == "Click (PCM)") {
+            auto pcm = esphome::tx_ultimate_easy::RtttlSynth::generate(inst);
+            esphome::tx_ultimate_easy::RtttlSynth::play_8bit(spk, pcm);
+            return;
+          }
+
+          std::string user1 = id(tx_rtttl_custom)->state;
+          std::string user2 = id(tx_rtttl_custom_2)->state;
+
+          const char *rtttl_str = nullptr;
+          if (sound == "Scale Up") { rtttl_str = "${rtttl_scale_up}"; }
+          else if (sound == "Scale Down") { rtttl_str = "${rtttl_scale_down}"; }
+          else if (sound == "Power Up") { rtttl_str = "${rtttl_power_up}"; }
+          else if (sound == "Power Down") { rtttl_str = "${rtttl_power_down}"; }
+          else if (sound == "Notification") { rtttl_str = "${rtttl_notification}"; }
+          else if (sound == "Chirp") { rtttl_str = "${rtttl_chirp}"; }
+          else if (sound == "Beep") { rtttl_str = "${rtttl_beep}"; }
+          else if (sound == "Ascending") { rtttl_str = "${rtttl_ascending}"; }
+          else if (sound == "Descending") { rtttl_str = "${rtttl_descending}"; }
+          else if (sound == "Triplet") { rtttl_str = "${rtttl_triplet}"; }
+          else if (sound == "Triplet Down") { rtttl_str = "${rtttl_triplet_down}"; }
+          else if (sound == "Fanfare") { rtttl_str = "${rtttl_fanfare}"; }
+          else if (sound == "Twinkle") { rtttl_str = "${rtttl_twinkle}"; }
+          else if (sound == "Ding Dong") { rtttl_str = "${rtttl_ding_dong}"; }
+          else if (sound == "Buzzer") { rtttl_str = "${rtttl_buzzer}"; }
+          else if (sound == "User Defined 1") { rtttl_str = user1.c_str(); }
+          else if (sound == "User Defined 2") { rtttl_str = user2.c_str(); }
+
+          if (rtttl_str && rtttl_str[0]) {
+            esphome::tx_ultimate_easy::RtttlSynth::play_rtttl(spk, inst, rtttl_str);
+          }
+
   - id: speaker_setup
     then:
-      - if:
-          condition:
-            select.is:
-              id: sl_touch_speaker_feedback
-              options:
-                - "On press"
-                - "On release"
-                - "Always"
-          then:
-            - lambda: speaker_embedded->start();
-          else:
-            - lambda: speaker_embedded->stop();
+      - lambda: |-
+          auto ron = id(sl_relay_on_sound)->current_option();
+          auto roff = id(sl_relay_off_sound)->current_option();
+          auto touch = id(sl_touch_speaker_feedback)->current_option();
+          if (ron != "Off" || roff != "Off" ||
+              touch == "On press" || touch == "On release" || touch == "Always") {
+            id(speaker_embedded)->start();
+          } else {
+            id(speaker_embedded)->stop();
+          }
 
   - id: !extend touch_on_multi_touch_release
     then:
@@ -289,6 +500,29 @@ script:
           }
           #endif
 
+text:
+  - id: tx_rtttl_custom
+    name: User Defined 1
+    platform: template
+    mode: text
+    optimistic: true
+    restore_value: true
+    entity_category: config
+    icon: mdi:music-note
+    min_length: 0
+    max_length: 255
+
+  - id: tx_rtttl_custom_2
+    name: User Defined 2
+    platform: template
+    mode: text
+    optimistic: true
+    restore_value: true
+    entity_category: config
+    icon: mdi:music-note
+    min_length: 0
+    max_length: 255
+
 select:
   - id: sl_touch_speaker_feedback
     name: Touch - Speaker feedback
@@ -308,6 +542,172 @@ select:
     on_value:
       then:
         - script.execute: speaker_setup
+
+  - id: sl_relay_on_sound
+    name: Relay ON - Speaker feedback
+    platform: template
+    options:
+      - "Off"
+      - "Click (PCM)"
+      - "Scale Up"
+      - "Scale Down"
+      - "Power Up"
+      - "Power Down"
+      - "Notification"
+      - "Chirp"
+      - "Beep"
+      - "Ascending"
+      - "Descending"
+      - "Triplet"
+      - "Triplet Down"
+      - "Fanfare"
+      - "Twinkle"
+      - "Ding Dong"
+      - "Buzzer"
+      - "User Defined 1"
+      - "User Defined 2"
+    initial_option: "Off"
+    optimistic: true
+    restore_value: true
+    entity_category: config
+    icon: mdi:speaker
+    on_value:
+      then:
+        - script.execute: speaker_setup
+
+  - id: sl_relay_on_instrument
+    name: Relay ON - RTTTL instrument
+    platform: template
+    options:
+      - "Gameboy"
+      - "Bell"
+      - "Organ"
+      - "Piano"
+      - "Chime"
+      - "Synth"
+      - "Alarm"
+    initial_option: "Piano"
+    optimistic: true
+    restore_value: true
+    entity_category: config
+    icon: mdi:piano
+
+  - id: sl_relay_off_sound
+    name: Relay OFF - Speaker feedback
+    platform: template
+    options:
+      - "Off"
+      - "Click (PCM)"
+      - "Scale Up"
+      - "Scale Down"
+      - "Power Up"
+      - "Power Down"
+      - "Notification"
+      - "Chirp"
+      - "Beep"
+      - "Ascending"
+      - "Descending"
+      - "Triplet"
+      - "Triplet Down"
+      - "Fanfare"
+      - "Twinkle"
+      - "Ding Dong"
+      - "Buzzer"
+      - "User Defined 1"
+      - "User Defined 2"
+    initial_option: "Off"
+    optimistic: true
+    restore_value: true
+    entity_category: config
+    icon: mdi:speaker-off
+    on_value:
+      then:
+        - script.execute: speaker_setup
+
+  - id: sl_relay_off_instrument
+    name: Relay OFF - RTTTL instrument
+    platform: template
+    options:
+      - "Gameboy"
+      - "Bell"
+      - "Organ"
+      - "Piano"
+      - "Chime"
+      - "Synth"
+      - "Alarm"
+    initial_option: "Piano"
+    optimistic: true
+    restore_value: true
+    entity_category: config
+    icon: mdi:piano
+
+  - id: sl_rtttl_default_instrument
+    name: RTTTL default instrument
+    platform: template
+    options:
+      - "Gameboy"
+      - "Bell"
+      - "Organ"
+      - "Piano"
+      - "Chime"
+      - "Synth"
+      - "Alarm"
+    initial_option: "Gameboy"
+    optimistic: true
+    restore_value: true
+    entity_category: config
+    icon: mdi:piano
+    disabled_by_default: true
+
+button:
+  - id: btn_preview_relay_on
+    name: Preview Relay ON
+    platform: template
+    entity_category: diagnostic
+    icon: mdi:play-circle
+    on_press:
+      - script.execute: play_relay_on
+
+  - id: btn_preview_relay_off
+    name: Preview Relay OFF
+    platform: template
+    entity_category: diagnostic
+    icon: mdi:play-circle
+    on_press:
+      - script.execute: play_relay_off
+
+light:
+  - id: !extend light_output_1
+    on_turn_on:
+      then:
+        - script.execute: play_relay_on
+    on_turn_off:
+      then:
+        - script.execute: play_relay_off
+
+  - id: !extend light_output_2
+    on_turn_on:
+      then:
+        - script.execute: play_relay_on
+    on_turn_off:
+      then:
+        - script.execute: play_relay_off
+
+  - id: !extend light_output_3
+    on_turn_on:
+      then:
+        - script.execute: play_relay_on
+    on_turn_off:
+      then:
+        - script.execute: play_relay_off
+
+  - id: !extend light_output_4
+    on_turn_on:
+      then:
+        - script.execute: play_relay_on
+    on_turn_off:
+      then:
+        - script.execute: play_relay_off
 
 speaker:
   - id: speaker_embedded

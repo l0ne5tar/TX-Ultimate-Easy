@@ -126,14 +126,10 @@ substitutions:
   TAG_HW_SPEAKER: tx_ultimate_easy.hw.speaker
 
 tx_ultimate_easy:
-  # The rtttl_synth config block is read by __init__.py to auto-generate
-  # rtttl_synth_data.h, which defines the rtttl_synth_instruments[] array.
-  # The instrument IDs below become entries in that array at fixed indices
-  # 0-6 (order here determines index).  The C++ helper instrument_index()
-  # maps the display name (e.g. "Bell") to the matching index, so the YAML
-  # "name" strings and the enum/array must stay in sync.
-  # If you add/remove/reorder instruments here, update instrument_index()
-  # in tx_ultimate_easy_rtttl_synth.h to match.
+  # Edit instruments/tunes in rtttl_synth below, then rebuild once.
+  # The C++ arrays are auto-generated from this config.
+  # Instrument selects (tx_ultimate_easy platform) populate their
+  # options from the generated C++ arrays at runtime — no manual list!
   rtttl_synth:
     sample_rate: 16000
     envelopes:
@@ -572,30 +568,9 @@ select:
 
   - id: sl_relay_on_sound
     name: Relay ON - Speaker feedback
-    platform: template
-    options:
-      - "Off"
-      - "Click (PCM)"
-      - "Scale Up"
-      - "Scale Down"
-      - "Power Up"
-      - "Power Down"
-      - "Notification"
-      - "Chirp"
-      - "Beep"
-      - "Ascending"
-      - "Descending"
-      - "Triplet"
-      - "Triplet Down"
-      - "Fanfare"
-      - "Twinkle"
-      - "Ding Dong"
-      - "Buzzer"
-      - "User Defined 1"
-      - "User Defined 2"
+    platform: tx_ultimate_easy
+    rtttl_type: tune
     initial_option: "Off"
-    optimistic: true
-    restore_value: true
     entity_category: config
     icon: mdi:speaker
     on_value:
@@ -604,47 +579,17 @@ select:
 
   - id: sl_relay_on_instrument
     name: Relay ON - RTTTL instrument
-    platform: template
-    options:
-      - "Gameboy"
-      - "Bell"
-      - "Organ"
-      - "Piano"
-      - "Chime"
-      - "Synth"
-      - "Alarm"
+    platform: tx_ultimate_easy
+    rtttl_type: instrument
     initial_option: "Piano"
-    optimistic: true
-    restore_value: true
     entity_category: config
     icon: mdi:piano
 
   - id: sl_relay_off_sound
     name: Relay OFF - Speaker feedback
-    platform: template
-    options:
-      - "Off"
-      - "Click (PCM)"
-      - "Scale Up"
-      - "Scale Down"
-      - "Power Up"
-      - "Power Down"
-      - "Notification"
-      - "Chirp"
-      - "Beep"
-      - "Ascending"
-      - "Descending"
-      - "Triplet"
-      - "Triplet Down"
-      - "Fanfare"
-      - "Twinkle"
-      - "Ding Dong"
-      - "Buzzer"
-      - "User Defined 1"
-      - "User Defined 2"
+    platform: tx_ultimate_easy
+    rtttl_type: tune
     initial_option: "Off"
-    optimistic: true
-    restore_value: true
     entity_category: config
     icon: mdi:speaker-off
     on_value:
@@ -653,35 +598,17 @@ select:
 
   - id: sl_relay_off_instrument
     name: Relay OFF - RTTTL instrument
-    platform: template
-    options:
-      - "Gameboy"
-      - "Bell"
-      - "Organ"
-      - "Piano"
-      - "Chime"
-      - "Synth"
-      - "Alarm"
+    platform: tx_ultimate_easy
+    rtttl_type: instrument
     initial_option: "Piano"
-    optimistic: true
-    restore_value: true
     entity_category: config
     icon: mdi:piano
 
   - id: sl_rtttl_default_instrument
     name: RTTTL default instrument
-    platform: template
-    options:
-      - "Gameboy"
-      - "Bell"
-      - "Organ"
-      - "Piano"
-      - "Chime"
-      - "Synth"
-      - "Alarm"
+    platform: tx_ultimate_easy
+    rtttl_type: instrument
     initial_option: "Gameboy"
-    optimistic: true
-    restore_value: true
     entity_category: config
     icon: mdi:piano
     disabled_by_default: true

@@ -1,2 +1,9 @@
 *.cmd
 *.bat
+
+__pycache__/
+*.pyc
+
+# Auto-generated in to_code phase
+components/tx_ultimate_easy/rtttl_synth_data.h
+components/tx_ultimate_easy/rtttl_synth_data.inc

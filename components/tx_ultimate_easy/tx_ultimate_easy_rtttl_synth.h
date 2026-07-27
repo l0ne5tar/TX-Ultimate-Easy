@@ -180,6 +180,9 @@ inline std::vector<uint8_t> RtttlSynth::generate_note(const RtttlSynthInstrument
 
     if (!isfinite(sample)) sample = 0.0f;
     buf[i] = static_cast<uint8_t>((sample + 1.0f) * 127.5f);
+
+    // Yield every ~4096 samples (~256ms @ 16kHz) to avoid TWDT timeout
+    if ((i & 0xFFF) == 0) vTaskDelay(pdMS_TO_TICKS(1));
   }
   return buf;
 }
@@ -400,6 +403,7 @@ inline void RtttlSynth::play_rtttl(speaker::Speaker *spk, const RtttlSynthInstru
     static int16_t silent[SILENT_CHUNK];
     memset(silent, 0, sizeof(silent));
     constexpr int MAX_RETRIES = 200;
+    int silence_iter = 0;
     while (ns > 0) {
       size_t cnt = ns > SILENT_CHUNK ? SILENT_CHUNK : ns;
       size_t to_write = cnt * sizeof(int16_t);
@@ -411,6 +415,8 @@ inline void RtttlSynth::play_rtttl(speaker::Speaker *spk, const RtttlSynthInstru
         else { retries++; if (retries > MAX_RETRIES) break; vTaskDelay(pdMS_TO_TICKS(5)); }
       }
       ns -= cnt;
+      // Yield every 8 chunks (~512ms @ 16kHz) to avoid TWDT timeout
+      if (++silence_iter % 8 == 0) vTaskDelay(pdMS_TO_TICKS(1));
     }
   };
 
@@ -448,6 +454,7 @@ inline void RtttlSynth::play_8bit(speaker::Speaker *spk, const std::vector<uint8
   static int16_t chunk[CHUNK_SAMPLES];
   constexpr int MAX_RETRIES = 200;
   size_t pos = 0;
+  int chunk_idx = 0;
   while (pos < data.size()) {
     size_t end = pos + CHUNK_SAMPLES;
     if (end > data.size()) end = data.size();
@@ -464,14 +471,9 @@ inline void RtttlSynth::play_8bit(speaker::Speaker *spk, const std::vector<uint8
       else { retries++; vTaskDelay(pdMS_TO_TICKS(5)); }
     }
     pos = end;
+    // Yield every 8 chunks (~128ms @ 16kHz) to avoid TWDT timeout
+    if (++chunk_idx % 8 == 0) vTaskDelay(pdMS_TO_TICKS(1));
   }
-}
-
-inline int RtttlSynth::instrument_index(const std::string &name) {
-  for (size_t i = 0; i < rtttl_synth_instrument_count; i++) {
-    if (name == rtttl_synth_instruments[i].name) return static_cast<int>(i);
-  }
-  return 0;  // Gameboy
 }
 
 }  // namespace tx_ultimate_easy

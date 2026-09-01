@@ -449,11 +449,27 @@ constexpr uint32_t RTTTL_PLAY_TASK_PRIORITY = 1;
 constexpr uint32_t RTTTL_PCM_TASK_STACK_WORDS = 2048;  // 8 KB - chunk[] is static
 constexpr uint32_t RTTTL_TUNE_TASK_STACK_WORDS = 6144;  // 24 KB - same budget as loop_task_stack_size
 
+// Wait for a graceful stop (finish) to fully land. Without this, the next
+// playback task can warm against a speaker that is only "RUNNING" because the
+// previous finish is still draining - then the stop lands mid-tune and every
+// note fail-fasts with NO SOUND. Keeping the single-task guard held until the
+// speaker is truly STOPPED forces the next task to start() from scratch.
+inline void wait_speaker_stopped(speaker::Speaker *spk) {
+  constexpr int STOP_POLL_MS = 10;
+  constexpr int STOP_TIMEOUT_MS = 2000;
+  for (int waited = 0; waited < STOP_TIMEOUT_MS; waited += STOP_POLL_MS) {
+    if (spk->is_stopped()) return;
+    vTaskDelay(pdMS_TO_TICKS(STOP_POLL_MS));
+  }
+  ESP_LOGW("rtttl_synth", "wait_speaker_stopped: speaker did not stop within %d ms", STOP_TIMEOUT_MS);
+}
+
 inline void rtttl_play_pcm_entry(void *params) {
   auto *ctx = static_cast<rtttl_play_ctx_pcm *>(params);
   if (warm_speaker(ctx->spk)) {
     RtttlSynth::play_8bit_internal(ctx->spk, ctx->data);
     ctx->spk->finish();
+    wait_speaker_stopped(ctx->spk);
   } else {
     ESP_LOGW("rtttl_synth", "rtttl_pcm: warm_speaker failed - no sound");
   }
@@ -467,6 +483,7 @@ inline void rtttl_play_tune_entry(void *params) {
   if (warm_speaker(ctx->spk)) {
     RtttlSynth::play_rtttl_internal(ctx->spk, ctx->inst, ctx->rtttl, ctx->sr);
     ctx->spk->finish();
+    wait_speaker_stopped(ctx->spk);
   } else {
     ESP_LOGW("rtttl_synth", "rtttl_tune: warm_speaker failed - no sound");
   }

@@ -6,6 +6,11 @@
 #include <cstring>
 #include <string>
 
+#ifdef USE_ESP32
+#include <freertos/FreeRTOS.h>
+#include <freertos/task.h>
+#endif
+
 // Forward declarations (provided by ESPHome headers in compilation context)
 namespace esphome {
 namespace speaker {
@@ -64,11 +69,22 @@ class RtttlSynth {
 
   /// Expand 8-bit unsigned PCM to 16-bit signed PCM and play in small chunks.
   /// Avoids allocating a full 2x output buffer.
+  /// Spawns a task that self-warms the speaker (start -> wait for RUNNING ->
+  /// play -> graceful stop) and returns immediately. No-op if another playback
+  /// task is already active.
   static void play_8bit(speaker::Speaker *spk, const std::vector<uint8_t> &data);
 
   /// Play an RTTTL string one note at a time (no large buffer).
+  /// Spawns one task for the whole tune (serialized notes, single writer) that
+  /// self-warms the speaker and stops it when done; returns immediately. No-op
+  /// if another playback task is already active.
   static void play_rtttl(speaker::Speaker *spk, const RtttlSynthInstrument &inst,
                           const std::string &rtttl, float sr = 16000.0f);
+
+  /// Blocking workers — run on their own task, never on the main loop task.
+  static void play_8bit_internal(speaker::Speaker *spk, const std::vector<uint8_t> &data);
+  static void play_rtttl_internal(speaker::Speaker *spk, const RtttlSynthInstrument &inst,
+                                   const std::string &rtttl, float sr);
 
   /// Map instrument name to index in rtttl_synth_instruments[].
   /// Returns 0 (Gameboy) on unknown name.
@@ -146,6 +162,11 @@ inline float adsr_envelope(float t_ms, const RtttlSynthEnvelope &env, float tota
 inline std::vector<uint8_t> RtttlSynth::generate_note(const RtttlSynthInstrument &inst,
                                                        float freq_hz, float dur_ms, float sr) {
   if (!isfinite(freq_hz) || freq_hz <= 0.0f) freq_hz = 440.0f;
+  if (inst.voices == nullptr || inst.voice_count == 0 || inst.voice_count > 32) {
+    ESP_LOGE("rtttl_synth", "generate_note: instrument '%s' bad voices (ptr=%p count=%u) - aborting",
+             inst.name, (const void *)inst.voices, (unsigned)inst.voice_count);
+    return {};
+  }
   size_t n = static_cast<size_t>(sr * dur_ms / 1000.0f);
   if (n < 8) n = 8;
   std::vector<uint8_t> buf(n);
@@ -380,9 +401,109 @@ inline std::vector<uint8_t> RtttlSynth::generate_rtttl(const RtttlSynthInstrumen
 // DO NOT replace this with generate_rtttl + play_8bit — the project does not
 // have enough free heap for a full RTTTL buffer.  This function generates and
 // plays one note at a time to keep peak heap usage low.
+//
+// Playback runs on its own FreeRTOS task. The I2S speaker only reaches the
+// RUNNING state from inside its own loop() on the main loop task, so blocking
+// here on the loop task would deadlock it against itself (TWDT reset). A task
+// can block freely; loopTask stays free to run the speaker state machine.
+// Each playback task owns the full speaker lifecycle: start() -> wait for
+// RUNNING -> play -> graceful finish(). One playback task max — the speaker
+// ring buffer is not multi-producer.
 // -----------------------------------------------------------------------------
+#ifdef USE_ESP32
+inline TaskHandle_t &get_active_play_task() {
+  static TaskHandle_t handle = nullptr;
+  return handle;
+}
+
+// Warm the speaker for a sound effect: raise start(), then poll until the
+// i2s_audio state machine (advanced by loopTask) latches RUNNING. Returns
+// false and issues a hard stop() to unwind if it never comes up.
+inline bool warm_speaker(speaker::Speaker *spk) {
+  if (spk->is_running()) return true;
+  spk->start();
+  constexpr int WARM_POLL_MS = 10;
+  constexpr int WARM_TIMEOUT_MS = 2000;
+  for (int waited = 0; waited < WARM_TIMEOUT_MS; waited += WARM_POLL_MS) {
+    vTaskDelay(pdMS_TO_TICKS(WARM_POLL_MS));
+    if (spk->is_running()) return true;
+  }
+  ESP_LOGE("rtttl_synth", "warm_speaker: speaker never reached RUNNING - aborting sound");
+  spk->stop();
+  return false;
+}
+
+struct rtttl_play_ctx_pcm {
+  speaker::Speaker *spk;
+  std::vector<uint8_t> data;
+};
+
+struct rtttl_play_ctx_tune {
+  speaker::Speaker *spk;
+  RtttlSynthInstrument inst;
+  std::string rtttl;
+  float sr;
+};
+
+constexpr uint32_t RTTTL_PLAY_TASK_PRIORITY = 1;
+constexpr uint32_t RTTTL_PCM_TASK_STACK_WORDS = 2048;  // 8 KB - chunk[] is static
+constexpr uint32_t RTTTL_TUNE_TASK_STACK_WORDS = 6144;  // 24 KB - same budget as loop_task_stack_size
+
+inline void rtttl_play_pcm_entry(void *params) {
+  auto *ctx = static_cast<rtttl_play_ctx_pcm *>(params);
+  if (warm_speaker(ctx->spk)) {
+    RtttlSynth::play_8bit_internal(ctx->spk, ctx->data);
+    ctx->spk->finish();
+  } else {
+    ESP_LOGW("rtttl_synth", "rtttl_pcm: warm_speaker failed - no sound");
+  }
+  get_active_play_task() = nullptr;
+  delete ctx;
+  vTaskDelete(nullptr);
+}
+
+inline void rtttl_play_tune_entry(void *params) {
+  auto *ctx = static_cast<rtttl_play_ctx_tune *>(params);
+  if (warm_speaker(ctx->spk)) {
+    RtttlSynth::play_rtttl_internal(ctx->spk, ctx->inst, ctx->rtttl, ctx->sr);
+    ctx->spk->finish();
+  } else {
+    ESP_LOGW("rtttl_synth", "rtttl_tune: warm_speaker failed - no sound");
+  }
+  get_active_play_task() = nullptr;
+  delete ctx;
+  vTaskDelete(nullptr);
+}
+#endif
+
 inline void RtttlSynth::play_rtttl(speaker::Speaker *spk, const RtttlSynthInstrument &inst,
                                     const std::string &rtttl, float sr) {
+  if (spk == nullptr) {
+    ESP_LOGE("rtttl_synth", "play_rtttl: null speaker - aborting (instrument='%s')", inst.name);
+    return;
+  }
+#ifndef USE_ESP32
+  // Fallback (non-ESP32): run synchronously on the current task.
+  play_rtttl_internal(spk, inst, rtttl, sr);
+#else
+  if (get_active_play_task() != nullptr) {
+    ESP_LOGW("rtttl_synth", "play_rtttl: playback task already active - skipping tune");
+    return;
+  }
+  auto *ctx = new rtttl_play_ctx_tune{spk, inst, rtttl, sr};
+  TaskHandle_t handle = nullptr;
+  if (xTaskCreate(rtttl_play_tune_entry, "rtttl_tune", RTTTL_TUNE_TASK_STACK_WORDS, ctx,
+                  RTTTL_PLAY_TASK_PRIORITY, &handle) != pdPASS) {
+    ESP_LOGE("rtttl_synth", "play_rtttl: failed to create playback task");
+    delete ctx;
+    return;
+  }
+  get_active_play_task() = handle;
+#endif
+}
+
+inline void RtttlSynth::play_rtttl_internal(speaker::Speaker *spk, const RtttlSynthInstrument &inst,
+                                             const std::string &rtttl, float sr) {
   float bpm;
   int default_dur, default_octave;
   std::vector<rtttl_detail::RtttlNote> notes;
@@ -391,70 +512,105 @@ inline void RtttlSynth::play_rtttl(speaker::Speaker *spk, const RtttlSynthInstru
     return;
   }
 
-  // Fill silence to keep the DMA pipeline running during rests and gaps
+  // Fill silence to keep the DMA pipeline running during rests and gaps.
+  // Fails fast if the speaker stops mid-tune instead of spinning.
   auto make_silence = [&](float dur_ms) {
     if (dur_ms <= 0.0f) return;
+    if (!spk->is_running()) {
+      ESP_LOGE("rtttl_synth", "    make_silence: speaker not RUNNING - aborting tune");
+      return;
+    }
     size_t ns = static_cast<size_t>(sr * dur_ms / 1000.0f);
     if (ns == 0) return;
-    static int silence_call = 0;
-    silence_call++;
-    ESP_LOGD("rtttl_synth", "    make_silence[%d]: dur=%.1f ns=%u", silence_call, dur_ms, (unsigned)ns);
     static constexpr size_t SILENT_CHUNK = 1024;
     static int16_t silent[SILENT_CHUNK];
     memset(silent, 0, sizeof(silent));
-    constexpr int MAX_RETRIES = 200;
+    constexpr int MAX_RETRIES = 25;
     int silence_iter = 0;
     while (ns > 0) {
       size_t cnt = ns > SILENT_CHUNK ? SILENT_CHUNK : ns;
       size_t to_write = cnt * sizeof(int16_t);
       size_t written = 0;
       int retries = 0;
-      while (written < to_write) {
+      while (written < to_write && retries <= MAX_RETRIES) {
         size_t n = spk->play(reinterpret_cast<const uint8_t *>(silent) + written, to_write - written, pdMS_TO_TICKS(50));
         if (n > 0) { written += n; retries = 0; }
-        else { retries++; if (retries > MAX_RETRIES) break; vTaskDelay(pdMS_TO_TICKS(5)); }
+        else { retries++; vTaskDelay(pdMS_TO_TICKS(5)); }
       }
       ns -= cnt;
-      // Yield every 8 chunks (~512ms @ 16kHz) to avoid TWDT timeout
+      // Yield every 8 chunks (~512ms @ 16kHz) to avoid starving lower tasks
       if (++silence_iter % 8 == 0) vTaskDelay(pdMS_TO_TICKS(1));
     }
   };
 
   ESP_LOGD("rtttl_synth", "play_rtttl: %u notes, bpm=%.0f", (unsigned)notes.size(), bpm);
-  int note_idx = 0;
   for (auto &n : notes) {
     if (n.rest) {
-      ESP_LOGD("rtttl_synth", "  note[%d]: REST dur=%.1f", note_idx, n.dur_ms);
       make_silence(n.dur_ms);
     } else {
+      if (inst.voices == nullptr || inst.voice_count == 0) {
+        ESP_LOGE("rtttl_synth", "play_rtttl: instrument '%s' has invalid voices (ptr=%p count=%u) - aborting",
+                 inst.name, (const void *)inst.voices, (unsigned)inst.voice_count);
+        return;
+      }
       float gap_ms = (n.dur_ms > 50.0f) ? 2.0f : n.dur_ms * 0.02f;
       float play_ms = n.dur_ms - gap_ms;
-      ESP_LOGD("rtttl_synth", "  note[%d]: freq=%.0f play=%.1f gap=%.1f", note_idx, n.freq_hz, play_ms, gap_ms);
       auto buf = generate_note(inst, n.freq_hz, play_ms, sr);
-      ESP_LOGD("rtttl_synth", "    generate_note -> %u samples", (unsigned)buf.size());
-      play_8bit(spk, buf);
-      ESP_LOGD("rtttl_synth", "    make_silence(%.1f)", gap_ms);
+      play_8bit_internal(spk, buf);
       make_silence(gap_ms);
     }
-    note_idx++;
   }
   ESP_LOGD("rtttl_synth", "play_rtttl done");
 }
 
 // -----------------------------------------------------------------------------
 // Streaming 8-bit → 16-bit converter + player
+// Fails fast: if the speaker is not RUNNING (or another playback task is
+// active) it logs an error and returns with no sound instead of spinning on a
+// state it cannot change.
 // -----------------------------------------------------------------------------
 inline void RtttlSynth::play_8bit(speaker::Speaker *spk, const std::vector<uint8_t> &data) {
   if (data.empty()) return;
-  static int call_count = 0;
-  call_count++;
-  ESP_LOGD("rtttl_synth", "  play_8bit[%d]: %u bytes (%u chunks)",
-           call_count, (unsigned)data.size(), (unsigned)((data.size() + 255) / 256));
+  if (spk == nullptr) {
+    ESP_LOGE("rtttl_synth", "play_8bit: null speaker - aborting (%u bytes)", (unsigned)data.size());
+    return;
+  }
+#ifndef USE_ESP32
+  // Fallback (non-ESP32): run synchronously on the current task.
+  play_8bit_internal(spk, data);
+#else
+  if (get_active_play_task() != nullptr) {
+    ESP_LOGW("rtttl_synth", "play_8bit: playback task already active - dropping %u bytes", (unsigned)data.size());
+    return;
+  }
+  auto *ctx = new rtttl_play_ctx_pcm{spk, data};
+  TaskHandle_t handle = nullptr;
+  if (xTaskCreate(rtttl_play_pcm_entry, "rtttl_pcm", RTTTL_PCM_TASK_STACK_WORDS, ctx,
+                  RTTTL_PLAY_TASK_PRIORITY, &handle) != pdPASS) {
+    ESP_LOGE("rtttl_synth", "play_8bit: failed to create playback task");
+    delete ctx;
+    return;
+  }
+  get_active_play_task() = handle;
+#endif
+}
+
+inline void RtttlSynth::play_8bit_internal(speaker::Speaker *spk, const std::vector<uint8_t> &data) {
+  if (data.empty() || spk == nullptr) return;
+  if (!spk->is_running()) {
+    ESP_LOGE("rtttl_synth", "play_8bit: speaker not RUNNING - aborting (%u bytes, NO SOUND)",
+             (unsigned)data.size());
+    return;
+  }
   constexpr size_t CHUNK_SAMPLES = 256;  // 512 bytes per chunk
   static int16_t chunk[CHUNK_SAMPLES];
-  constexpr int MAX_RETRIES = 200;
+  // Bounded backpressure only: the speaker is confirmed RUNNING, so play()
+  // will accept bytes as the DMA drains. 25 retries (~1.25s) per chunk is a
+  // sanity bound, not a wait for a state change.
+  constexpr int MAX_RETRIES = 25;
   size_t pos = 0;
   int chunk_idx = 0;
+  bool warned = false;
   while (pos < data.size()) {
     size_t end = pos + CHUNK_SAMPLES;
     if (end > data.size()) end = data.size();
@@ -470,8 +626,12 @@ inline void RtttlSynth::play_8bit(speaker::Speaker *spk, const std::vector<uint8
       if (n > 0) { written += n; retries = 0; }
       else { retries++; vTaskDelay(pdMS_TO_TICKS(5)); }
     }
+    if (written < bytes && !warned) {
+      ESP_LOGW("rtttl_synth", "play_8bit: buffer did not drain - dropped %u bytes", (unsigned)(bytes - written));
+      warned = true;
+    }
     pos = end;
-    // Yield every 8 chunks (~128ms @ 16kHz) to avoid TWDT timeout
+    // Yield every 8 chunks (~128ms @ 16kHz) to avoid starving lower tasks
     if (++chunk_idx % 8 == 0) vTaskDelay(pdMS_TO_TICKS(1));
   }
 }

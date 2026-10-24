@@ -981,13 +981,18 @@ script:
                   ESP_LOGV("${TAG_HW_RELAYS}", "Light Mode for Relay %" PRIu8 ": %s", i + 1, light_mode.c_str());
 
                   // Use light_set_state for light updates
-                  if (light_mode != "${LIGHT_MODE_DISABLED_TEXT}") {
-                    if (light_mode == "${LIGHT_MODE_BOTTOM_OR_LEFT_TEXT}" || light_mode == "${LIGHT_MODE_BOTH_TEXT}") {
-                      light_set_state->execute(1, i, relay_state);  // Left/bottom light
-                    }
-                    if (light_mode == "${LIGHT_MODE_TOP_OR_RIGHT_TEXT}" || light_mode == "${LIGHT_MODE_BOTH_TEXT}") {
-                      light_set_state->execute(2, i, relay_state);  // Right/top light
-                    }
+                  if (light_mode == "${LIGHT_MODE_DISABLED_TEXT}") {
+                    light_set_state->execute(1, i, false);
+                    light_set_state->execute(2, i, false);
+                  } else {
+                    const bool group_1_active =
+                      light_mode == "${LIGHT_MODE_BOTTOM_OR_LEFT_TEXT}" ||
+                      light_mode == "${LIGHT_MODE_BOTH_TEXT}";
+                    const bool group_2_active =
+                      light_mode == "${LIGHT_MODE_TOP_OR_RIGHT_TEXT}" ||
+                      light_mode == "${LIGHT_MODE_BOTH_TEXT}";
+                    light_set_state->execute(1, i, group_1_active ? relay_state : false);
+                    light_set_state->execute(2, i, group_2_active ? relay_state : false);
                   }
                 }
 
@@ -1044,27 +1049,30 @@ select:
             return;
           }
 
-          if (previous_mode != "${LIGHT_MODE_DISABLED_TEXT}" && current_mode == "${LIGHT_MODE_DISABLED_TEXT}") {
-            // Transitioning TO Disabled - turn off lights
+          if (current_mode == "${LIGHT_MODE_DISABLED_TEXT}") {
+            // Disabled (or transitioning to it): turn off both groups.
             ESP_LOGI("${TAG_HW_RELAYS}",
                       "Relay 1 light mode changed to ${LIGHT_MODE_DISABLED_TEXT} - turning off lights");
             id(light_set_state)->execute(1, 0, false);  // Group 1, relay index 0
             id(light_set_state)->execute(2, 0, false);  // Group 2, relay index 0
-          } else if (previous_mode == "${LIGHT_MODE_DISABLED_TEXT}" && current_mode != "${LIGHT_MODE_DISABLED_TEXT}") {
-            // Transitioning FROM Disabled - update lights based on relay state
+          } else {
+            // Active mode (including transitions between two active modes): paint the
+            // active groups and clear the inactive ones so no stale LED survives.
             ESP_LOGI("${TAG_HW_RELAYS}",
-                      "Relay 1 light mode changed from ${LIGHT_MODE_DISABLED_TEXT} - updating lights");
+                      "Relay 1 light mode changed to %s - updating lights", current_mode.c_str());
             const bool api_connected = global_api_server->is_connected() and
                                        wifi_component->is_connected();
             bool relay_state = (sl_button_1_action->active_index().value_or(1) == 3 and api_connected)
                                    ? id(virtual_relay_1_state)
                                    : id(relay_1_state);
-            if (current_mode == "${LIGHT_MODE_BOTTOM_OR_LEFT_TEXT}" || current_mode == "${LIGHT_MODE_BOTH_TEXT}") {
-              id(light_set_state)->execute(1, 0, relay_state);
-            }
-            if (current_mode == "${LIGHT_MODE_TOP_OR_RIGHT_TEXT}" || current_mode == "${LIGHT_MODE_BOTH_TEXT}") {
-              id(light_set_state)->execute(2, 0, relay_state);
-            }
+            const bool group_1_active =
+              current_mode == "${LIGHT_MODE_BOTTOM_OR_LEFT_TEXT}" ||
+              current_mode == "${LIGHT_MODE_BOTH_TEXT}";
+            const bool group_2_active =
+              current_mode == "${LIGHT_MODE_TOP_OR_RIGHT_TEXT}" ||
+              current_mode == "${LIGHT_MODE_BOTH_TEXT}";
+            id(light_set_state)->execute(1, 0, group_1_active ? relay_state : false);
+            id(light_set_state)->execute(2, 0, group_2_active ? relay_state : false);
           }
 
           previous_mode = current_mode;
@@ -1087,27 +1095,27 @@ select:
             return;
           }
 
-          if (previous_mode != "${LIGHT_MODE_DISABLED_TEXT}" && current_mode == "${LIGHT_MODE_DISABLED_TEXT}") {
-            // Transitioning TO Disabled - turn off lights
+          if (current_mode == "${LIGHT_MODE_DISABLED_TEXT}") {
             ESP_LOGI("${TAG_HW_RELAYS}",
                       "Relay 2 light mode changed to ${LIGHT_MODE_DISABLED_TEXT} - turning off lights");
-            id(light_set_state)->execute(1, 1, false);  // Group 1, relay index 1
-            id(light_set_state)->execute(2, 1, false);  // Group 2, relay index 1
-          } else if (previous_mode == "${LIGHT_MODE_DISABLED_TEXT}" && current_mode != "${LIGHT_MODE_DISABLED_TEXT}") {
-            // Transitioning FROM Disabled - update lights based on relay state
+            id(light_set_state)->execute(1, 1, false);
+            id(light_set_state)->execute(2, 1, false);
+          } else {
             ESP_LOGI("${TAG_HW_RELAYS}",
-                      "Relay 2 light mode changed from ${LIGHT_MODE_DISABLED_TEXT} - updating lights");
+                      "Relay 2 light mode changed to %s - updating lights", current_mode.c_str());
             const bool api_connected = global_api_server->is_connected() and
                                        wifi_component->is_connected();
             bool relay_state = (sl_button_2_action->active_index().value_or(1) == 3 and api_connected)
                                    ? id(virtual_relay_2_state)
                                    : id(relay_2_state);
-            if (current_mode == "${LIGHT_MODE_BOTTOM_OR_LEFT_TEXT}" || current_mode == "${LIGHT_MODE_BOTH_TEXT}") {
-              id(light_set_state)->execute(1, 1, relay_state);
-            }
-            if (current_mode == "${LIGHT_MODE_TOP_OR_RIGHT_TEXT}" || current_mode == "${LIGHT_MODE_BOTH_TEXT}") {
-              id(light_set_state)->execute(2, 1, relay_state);
-            }
+            const bool group_1_active =
+              current_mode == "${LIGHT_MODE_BOTTOM_OR_LEFT_TEXT}" ||
+              current_mode == "${LIGHT_MODE_BOTH_TEXT}";
+            const bool group_2_active =
+              current_mode == "${LIGHT_MODE_TOP_OR_RIGHT_TEXT}" ||
+              current_mode == "${LIGHT_MODE_BOTH_TEXT}";
+            id(light_set_state)->execute(1, 1, group_1_active ? relay_state : false);
+            id(light_set_state)->execute(2, 1, group_2_active ? relay_state : false);
           }
 
           previous_mode = current_mode;
@@ -1130,27 +1138,27 @@ select:
             return;
           }
 
-          if (previous_mode != "${LIGHT_MODE_DISABLED_TEXT}" && current_mode == "${LIGHT_MODE_DISABLED_TEXT}") {
-            // Transitioning TO Disabled - turn off lights
+          if (current_mode == "${LIGHT_MODE_DISABLED_TEXT}") {
             ESP_LOGI("${TAG_HW_RELAYS}",
                       "Relay 3 light mode changed to ${LIGHT_MODE_DISABLED_TEXT} - turning off lights");
-            id(light_set_state)->execute(1, 2, false);  // Group 1, relay index 2
-            id(light_set_state)->execute(2, 2, false);  // Group 2, relay index 2
-          } else if (previous_mode == "${LIGHT_MODE_DISABLED_TEXT}" && current_mode != "${LIGHT_MODE_DISABLED_TEXT}") {
-            // Transitioning FROM Disabled - update lights based on relay state
+            id(light_set_state)->execute(1, 2, false);
+            id(light_set_state)->execute(2, 2, false);
+          } else {
             ESP_LOGI("${TAG_HW_RELAYS}",
-                      "Relay 3 light mode changed from ${LIGHT_MODE_DISABLED_TEXT} - updating lights");
+                      "Relay 3 light mode changed to %s - updating lights", current_mode.c_str());
             const bool api_connected = global_api_server->is_connected() and
                                        wifi_component->is_connected();
             bool relay_state = (sl_button_3_action->active_index().value_or(1) == 3 and api_connected)
                                    ? id(virtual_relay_3_state)
                                    : id(relay_3_state);
-            if (current_mode == "${LIGHT_MODE_BOTTOM_OR_LEFT_TEXT}" || current_mode == "${LIGHT_MODE_BOTH_TEXT}") {
-              id(light_set_state)->execute(1, 2, relay_state);
-            }
-            if (current_mode == "${LIGHT_MODE_TOP_OR_RIGHT_TEXT}" || current_mode == "${LIGHT_MODE_BOTH_TEXT}") {
-              id(light_set_state)->execute(2, 2, relay_state);
-            }
+            const bool group_1_active =
+              current_mode == "${LIGHT_MODE_BOTTOM_OR_LEFT_TEXT}" ||
+              current_mode == "${LIGHT_MODE_BOTH_TEXT}";
+            const bool group_2_active =
+              current_mode == "${LIGHT_MODE_TOP_OR_RIGHT_TEXT}" ||
+              current_mode == "${LIGHT_MODE_BOTH_TEXT}";
+            id(light_set_state)->execute(1, 2, group_1_active ? relay_state : false);
+            id(light_set_state)->execute(2, 2, group_2_active ? relay_state : false);
           }
 
           previous_mode = current_mode;
@@ -1173,25 +1181,25 @@ select:
             return;
           }
 
-          if (previous_mode != "${LIGHT_MODE_DISABLED_TEXT}" && current_mode == "${LIGHT_MODE_DISABLED_TEXT}") {
-            // Transitioning TO Disabled - turn off lights
+          if (current_mode == "${LIGHT_MODE_DISABLED_TEXT}") {
             ESP_LOGI("${TAG_HW_RELAYS}", "Relay 4 light mode changed to ${LIGHT_MODE_DISABLED_TEXT} - turning off lights");
-            id(light_set_state)->execute(1, 3, false);  // Group 1, relay index 3
-            id(light_set_state)->execute(2, 3, false);  // Group 2, relay index 3
-          } else if (previous_mode == "${LIGHT_MODE_DISABLED_TEXT}" && current_mode != "${LIGHT_MODE_DISABLED_TEXT}") {
-            // Transitioning FROM Disabled - update lights based on relay state
-            ESP_LOGI("${TAG_HW_RELAYS}", "Relay 4 light mode changed from ${LIGHT_MODE_DISABLED_TEXT} - updating lights");
+            id(light_set_state)->execute(1, 3, false);
+            id(light_set_state)->execute(2, 3, false);
+          } else {
+            ESP_LOGI("${TAG_HW_RELAYS}", "Relay 4 light mode changed to %s - updating lights", current_mode.c_str());
             const bool api_connected = global_api_server->is_connected() and
                                        wifi_component->is_connected();
             bool relay_state = (sl_button_4_action->active_index().value_or(1) == 3 and api_connected)
                                    ? id(virtual_relay_4_state)
                                    : id(relay_4_state);
-            if (current_mode == "${LIGHT_MODE_BOTTOM_OR_LEFT_TEXT}" || current_mode == "${LIGHT_MODE_BOTH_TEXT}") {
-              id(light_set_state)->execute(1, 3, relay_state);
-            }
-            if (current_mode == "${LIGHT_MODE_TOP_OR_RIGHT_TEXT}" || current_mode == "${LIGHT_MODE_BOTH_TEXT}") {
-              id(light_set_state)->execute(2, 3, relay_state);
-            }
+            const bool group_1_active =
+              current_mode == "${LIGHT_MODE_BOTTOM_OR_LEFT_TEXT}" ||
+              current_mode == "${LIGHT_MODE_BOTH_TEXT}";
+            const bool group_2_active =
+              current_mode == "${LIGHT_MODE_TOP_OR_RIGHT_TEXT}" ||
+              current_mode == "${LIGHT_MODE_BOTH_TEXT}";
+            id(light_set_state)->execute(1, 3, group_1_active ? relay_state : false);
+            id(light_set_state)->execute(2, 3, group_2_active ? relay_state : false);
           }
 
           previous_mode = current_mode;

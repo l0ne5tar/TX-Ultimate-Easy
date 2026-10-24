@@ -237,6 +237,8 @@ real load, use `relay_2_mode: switch` instead so the button still works offline.
 The same pattern works across two panels: map a virtual relay on one panel to the physical relay on the
 other to create a multi-way switch.
 
+For groups of one physical relay plus any number of virtual relays, a ready-made Home Assistant blueprint
+is provided instead of hand-written automations: see [docs/blueprints.md](docs/blueprints.md).
 **Things to know:**
 
 - The virtual state is authoritative only while Home Assistant is connected. Offline it keeps its last

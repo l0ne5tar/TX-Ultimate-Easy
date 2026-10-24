@@ -146,12 +146,111 @@ For more details, please refer to our **[Events docs](docs/events.md)**.
 #### Relay Modes
 - **Light Mode**: Exposes the relay as a light entity with brightness controls (if supported)
 - **Switch Mode**: Exposes the relay as a simple on/off switch entity
+- **Disabled**: Leaves the physical relay unused
+
+Relay mode is effectively the **gang mode**: it selects the entity type for everything attached to that
+gang, including the physical relay and its virtual relay. It is set per gang in YAML (`relay_1_mode` …
+`relay_4_mode`) and requires a recompile to change. With `disabled` the physical relay is unused and that
+gang's virtual relay falls back to a switch.
 
 #### Button Actions
 - **None**: Allows using button events for custom automations
   Example: Trigger scenes or complex automations through Home Assistant
 - **Relay Toggle**: Direct control of the associated relay
   Example: Toggle relay state with each press, independent of Home Assistant
+- **Relay (API failsafe only)**: Toggles the associated relay only while the API is disconnected
+  Example: Keep a physical fallback without changing normal behaviour while Home Assistant is connected
+- **Virtual Relay (Relay API failsafe only)**: Toggles the associated virtual relay while Home Assistant
+  is connected, or the physical relay when it is not
+  Example: Remap a button to another relay or load through Home Assistant (see [Virtual Relays](#virtual-relays))
+
+#### Virtual Relays
+
+Virtual relays are state-only entities that Home Assistant can map to any physical relay, without the
+device needing to know the mapping. Typical uses:
+
+- **Multi-way switching**: make a second button control an existing light
+- **Panel remapping**: move a button's function to a different relay or load
+- **Scene/automation buttons**: let a button drive an arbitrary Home Assistant action while keeping the
+  panel's indicator LEDs in sync
+
+They are enabled by default and can be hidden with the `virtual_relays` substitution. The button action
+keeps working locally when the entities are hidden:
+
+```yaml
+substitutions:
+  virtual_relays: false   # hide the Virtual Relay entities from Home Assistant
+```
+
+**Behaviour:**
+
+| Button action | API/Wi-Fi connected | API/Wi-Fi disconnected |
+|---|---|---|
+| `None` | nothing | nothing |
+| `Relay N (toggle)` | toggles physical relay N | toggles physical relay N |
+| `Relay N (API failsafe only)` | nothing | toggles physical relay N |
+| `Virtual Relay N` | toggles virtual relay N only; the physical relay is untouched | toggles physical relay N only (exactly like `Relay N (toggle)`); the virtual state is untouched |
+
+The indicator LEDs follow the virtual relay only while the button action is `Virtual Relay N` **and**
+Home Assistant is connected. In every other case — including whenever the API or Wi-Fi is down — they
+follow the physical relay. Offline, the panel therefore behaves exactly like a normal relay panel:
+touches toggle the physical relay, the LEDs follow it, pulse works normally, and ESP-NOW changes are shown.
+
+Virtual relays have no pulse: a virtual relay stays on or off until it is changed again. If a virtual
+relay is mapped to a pulsing physical relay, Home Assistant sees the physical pulse expire and can
+propagate that to the virtual relay.
+
+**Home Assistant mapping:**
+
+The device does not guess the mapping. While connected, Home Assistant is expected to keep the virtual
+relay in sync with whatever it represents. For example, to let a spare gang control the gang 1 relay:
+
+```yaml
+substitutions:
+  relay_1_mode: switch    # gang 1 is the real relay
+  relay_2_mode: disabled  # gang 2 has no physical load
+  # Button 2 action: Virtual Relay 2 (Relay API failsafe only)
+```
+
+```yaml
+# Home Assistant automation: mirror the two entities in both directions.
+# Pressing either gang changes the hall relay, and both gang LEDs follow it.
+alias: TX Ultimate - spare gang controls the hall relay
+mode: restart
+triggers:
+  - trigger: state
+    entity_id: switch.relay_1
+  - trigger: state
+    entity_id: switch.virtual_relay_2
+actions:
+  - action: "switch.turn_{{ trigger.to_state.state }}"
+    target:
+      entity_id: >-
+        {{ 'switch.virtual_relay_2' if trigger.entity_id == 'switch.relay_1'
+           else 'switch.relay_1' }}
+```
+
+Because this example uses `relay_2_mode: disabled`, the spare gang only works while Home Assistant is
+connected — offline it has no physical relay to fall back to. If the spare gang has a relay wired to a
+real load, use `relay_2_mode: switch` instead so the button still works offline.
+
+The same pattern works across two panels: map a virtual relay on one panel to the physical relay on the
+other to create a multi-way switch.
+
+**Things to know:**
+
+- The virtual state is authoritative only while Home Assistant is connected. Offline it keeps its last
+  value but has no effect, and the LEDs fall back to the physical relay.
+- Home Assistant treats the physical relay as the source of truth; it should push the physical state to
+  the mapped virtual relay(s) after a reconnect.
+- `relay_N_mode` selects both the physical and the virtual entity type, so a gang set to `light` exposes
+  `Virtual Relay N` as a light. Changing it is compile-time and creates/removes entities; the virtual
+  state may need to be re-synced from Home Assistant after a switch↔light change.
+- Virtual relays never drive hardware. Changes made from Home Assistant update the state and LEDs only —
+  no click sound or vibration. Touch feedback is unaffected.
+- ESP-NOW sending is independent of the button action. With **ESP-NOW Send = Always**, a click on a
+  `Virtual Relay` button still sends its ESP-NOW toggle; with **API failsafe only** it sends only while
+  offline, which matches the virtual action's offline behaviour.
 
 #### Automation
 All device behaviors can be customized through Home Assistant automations without relying on local device triggers.

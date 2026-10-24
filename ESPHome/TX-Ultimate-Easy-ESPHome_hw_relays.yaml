@@ -13,7 +13,16 @@
 ---
 substitutions:
   expose_relays_leds_to_ha: false
+  # Virtual relays are state-only entities that Home Assistant can map to any
+  # physical relay. Set to false to hide them from Home Assistant (the virtual
+  # button action stays available and keeps working locally).
+  virtual_relays: true
 
+  # Relay mode is effectively the GANG mode: it selects the entity type for
+  # everything attached to that gang, including the physical relay and its
+  # virtual relay. 'switch' exposes both as switches, 'light' exposes both as
+  # lights, and 'disabled' leaves the physical relay unused (the virtual relay
+  # then falls back to a switch).
   relay_1_mode: switch  # 'switch', 'light', or 'disabled'
   relay_2_mode: switch  # 'switch', 'light', or 'disabled'
   relay_3_mode: switch  # 'switch', 'light', or 'disabled'
@@ -52,6 +61,25 @@ esphome:
   build_flags:
     - -D TX_ULTIMATE_EASY_HW_RELAYS
 
+# The virtual state is only authoritative while Home Assistant can see it.
+# Repaint when connectivity changes so the LEDs switch between the virtual
+# state (connected) and the physical relay state (offline).
+api:
+  on_client_connected:
+    then:
+      - script.execute: show_relay_status
+  on_client_disconnected:
+    then:
+      - script.execute: show_relay_status
+
+wifi:
+  on_connect:
+    then:
+      - script.execute: show_relay_status
+  on_disconnect:
+    then:
+      - script.execute: show_relay_status
+
 globals:
   - id: boot_initialization_relays
     type: bool
@@ -87,6 +115,22 @@ globals:
     type: bool
     initial_value: 'false'
   - id: relay_4_state
+    type: bool
+    initial_value: 'false'
+
+  # State of the virtual relays. This is the source of truth for the indicator
+  # LEDs when the associated button action is a virtual relay. The matching
+  # switch/light entity restores its own state on boot and repopulates these.
+  - id: virtual_relay_1_state
+    type: bool
+    initial_value: 'false'
+  - id: virtual_relay_2_state
+    type: bool
+    initial_value: 'false'
+  - id: virtual_relay_3_state
+    type: bool
+    initial_value: 'false'
+  - id: virtual_relay_4_state
     type: bool
     initial_value: 'false'
 
@@ -163,6 +207,110 @@ light:
         - lambda: |-
             id(relay_4_state) = false;
             show_relay_status->execute();
+
+  # Virtual relays are state-only: they never drive a physical relay.
+  # The entity type mirrors relay_N_mode (switch or light). Only the variant
+  # matching the configured mode reacts to its own actions; the other one is
+  # internal and ignores them so it cannot overwrite the active state at boot.
+  - id: light_virtual_relay_1
+    name: Virtual Relay 1
+    output: output_virtual_relays
+    platform: binary
+    internal: ${SL_RELAY_1_MODE != 2 or gang_count < 1 or not virtual_relays}
+    # Only the active variant restores from NVS. The inactive one must not,
+    # because both variants share the same entity name (and therefore NVS key)
+    # while storing different value sizes.
+    restore_mode: ${ RELAYS_LIGHT_RESTORE_MODE if SL_RELAY_1_MODE == 2 else "ALWAYS_OFF" }
+    on_turn_on:
+      then:
+        - if:
+            condition:
+              lambda: return ${SL_RELAY_1_MODE} == 2;
+            then:
+              - lambda: |-
+                  id(virtual_relay_1_state) = true;
+                  show_relay_status->execute();
+    on_turn_off:
+      then:
+        - if:
+            condition:
+              lambda: return ${SL_RELAY_1_MODE} == 2;
+            then:
+              - lambda: |-
+                  id(virtual_relay_1_state) = false;
+                  show_relay_status->execute();
+  - id: light_virtual_relay_2
+    name: Virtual Relay 2
+    output: output_virtual_relays
+    platform: binary
+    internal: ${SL_RELAY_2_MODE != 2 or gang_count < 2 or not virtual_relays}
+    restore_mode: ${ RELAYS_LIGHT_RESTORE_MODE if SL_RELAY_2_MODE == 2 else "ALWAYS_OFF" }
+    on_turn_on:
+      then:
+        - if:
+            condition:
+              lambda: return ${SL_RELAY_2_MODE} == 2;
+            then:
+              - lambda: |-
+                  id(virtual_relay_2_state) = true;
+                  show_relay_status->execute();
+    on_turn_off:
+      then:
+        - if:
+            condition:
+              lambda: return ${SL_RELAY_2_MODE} == 2;
+            then:
+              - lambda: |-
+                  id(virtual_relay_2_state) = false;
+                  show_relay_status->execute();
+  - id: light_virtual_relay_3
+    name: Virtual Relay 3
+    output: output_virtual_relays
+    platform: binary
+    internal: ${SL_RELAY_3_MODE != 2 or gang_count < 3 or not virtual_relays}
+    restore_mode: ${ RELAYS_LIGHT_RESTORE_MODE if SL_RELAY_3_MODE == 2 else "ALWAYS_OFF" }
+    on_turn_on:
+      then:
+        - if:
+            condition:
+              lambda: return ${SL_RELAY_3_MODE} == 2;
+            then:
+              - lambda: |-
+                  id(virtual_relay_3_state) = true;
+                  show_relay_status->execute();
+    on_turn_off:
+      then:
+        - if:
+            condition:
+              lambda: return ${SL_RELAY_3_MODE} == 2;
+            then:
+              - lambda: |-
+                  id(virtual_relay_3_state) = false;
+                  show_relay_status->execute();
+  - id: light_virtual_relay_4
+    name: Virtual Relay 4
+    output: output_virtual_relays
+    platform: binary
+    internal: ${SL_RELAY_4_MODE != 2 or gang_count < 4 or not virtual_relays}
+    restore_mode: ${ RELAYS_LIGHT_RESTORE_MODE if SL_RELAY_4_MODE == 2 else "ALWAYS_OFF" }
+    on_turn_on:
+      then:
+        - if:
+            condition:
+              lambda: return ${SL_RELAY_4_MODE} == 2;
+            then:
+              - lambda: |-
+                  id(virtual_relay_4_state) = true;
+                  show_relay_status->execute();
+    on_turn_off:
+      then:
+        - if:
+            condition:
+              lambda: return ${SL_RELAY_4_MODE} == 2;
+            then:
+              - lambda: |-
+                  id(virtual_relay_4_state) = false;
+                  show_relay_status->execute();
 
   # These lights are used to indicate relay's statuses
   - id: light_rl_1_1_${LIGHT_MODE_BOTTOM_OR_LEFT_TEXT}
@@ -349,6 +497,15 @@ output:
     platform: gpio
     pin: GPIO23
 
+  # No-op output backing the virtual relay lights. Virtual relays are state-only
+  # and must never drive hardware.
+  - id: output_virtual_relays
+    platform: template
+    type: binary
+    write_action:
+      - lambda: |-
+          // No-op: virtual relays are state-only.
+
 script:
   - id: !extend boot_initialize
     then:
@@ -461,6 +618,7 @@ script:
                                         !wifi_component->is_connected();
           std::string select_state;
           bool toggle_relay = false;
+          bool toggle_virtual = false;
           if (api_disconnected) {
             ESP_LOGW("${TAG_HW_RELAYS}", "Toggle relays:");
             ESP_LOGW("${TAG_HW_RELAYS}", "  API state: DISCONNECTED");
@@ -473,40 +631,99 @@ script:
           switch (button) {
             case ${BUTTON_1_ID}:
               select_state = sl_button_1_action->current_option();
+              // Offline, a virtual action behaves exactly like Relay (toggle).
+              toggle_virtual = (select_state == "${BUTTON_1_ACTION_VIRTUAL_TEXT}") and not api_disconnected;
               toggle_relay = (select_state == "${BUTTON_1_ACTION_TEXT}" or
-                              (api_disconnected and select_state == "${BUTTON_1_ACTION_FAILSAFE_TEXT}"));
+                              (api_disconnected and
+                               (select_state == "${BUTTON_1_ACTION_FAILSAFE_TEXT}" or
+                                select_state == "${BUTTON_1_ACTION_VIRTUAL_TEXT}")));
               if (toggle_relay && ${SL_RELAY_1_MODE} != 0)
                 sw_relay_1->toggle();
+              if (toggle_virtual) {
+                #if ${SL_RELAY_1_MODE} == 2
+                if (id(virtual_relay_1_state)) id(light_virtual_relay_1).turn_off().perform();
+                else id(light_virtual_relay_1).turn_on().perform();
+                #else
+                if (id(virtual_relay_1_state)) sw_virtual_relay_1->turn_off();
+                else sw_virtual_relay_1->turn_on();
+                #endif
+              }
               break;
             case ${BUTTON_2_ID}:
               select_state = sl_button_2_action->current_option();
+              // Offline, a virtual action behaves exactly like Relay (toggle).
+              toggle_virtual = (select_state == "${BUTTON_2_ACTION_VIRTUAL_TEXT}") and not api_disconnected;
               toggle_relay = (select_state == "${BUTTON_2_ACTION_TEXT}" or
-                              (api_disconnected and select_state == "${BUTTON_2_ACTION_FAILSAFE_TEXT}"));
+                              (api_disconnected and
+                               (select_state == "${BUTTON_2_ACTION_FAILSAFE_TEXT}" or
+                                select_state == "${BUTTON_2_ACTION_VIRTUAL_TEXT}")));
               if (toggle_relay && ${SL_RELAY_2_MODE} != 0)
                 sw_relay_2->toggle();
+              if (toggle_virtual) {
+                #if ${SL_RELAY_2_MODE} == 2
+                if (id(virtual_relay_2_state)) id(light_virtual_relay_2).turn_off().perform();
+                else id(light_virtual_relay_2).turn_on().perform();
+                #else
+                if (id(virtual_relay_2_state)) sw_virtual_relay_2->turn_off();
+                else sw_virtual_relay_2->turn_on();
+                #endif
+              }
               break;
             case ${BUTTON_3_ID}:
               select_state = sl_button_3_action->current_option();
+              // Offline, a virtual action behaves exactly like Relay (toggle).
+              toggle_virtual = (select_state == "${BUTTON_3_ACTION_VIRTUAL_TEXT}") and not api_disconnected;
               toggle_relay = (select_state == "${BUTTON_3_ACTION_TEXT}" or
-                              (api_disconnected and select_state == "${BUTTON_3_ACTION_FAILSAFE_TEXT}"));
+                              (api_disconnected and
+                               (select_state == "${BUTTON_3_ACTION_FAILSAFE_TEXT}" or
+                                select_state == "${BUTTON_3_ACTION_VIRTUAL_TEXT}")));
               if (toggle_relay && ${SL_RELAY_3_MODE} != 0)
                 sw_relay_3->toggle();
+              if (toggle_virtual) {
+                #if ${SL_RELAY_3_MODE} == 2
+                if (id(virtual_relay_3_state)) id(light_virtual_relay_3).turn_off().perform();
+                else id(light_virtual_relay_3).turn_on().perform();
+                #else
+                if (id(virtual_relay_3_state)) sw_virtual_relay_3->turn_off();
+                else sw_virtual_relay_3->turn_on();
+                #endif
+              }
               break;
             case ${BUTTON_4_ID}:
               select_state = sl_button_4_action->current_option();
+              // Offline, a virtual action behaves exactly like Relay (toggle).
+              toggle_virtual = (select_state == "${BUTTON_4_ACTION_VIRTUAL_TEXT}") and not api_disconnected;
               toggle_relay = (select_state == "${BUTTON_4_ACTION_TEXT}" or
-                              (api_disconnected and select_state == "${BUTTON_4_ACTION_FAILSAFE_TEXT}"));
+                              (api_disconnected and
+                               (select_state == "${BUTTON_4_ACTION_FAILSAFE_TEXT}" or
+                                select_state == "${BUTTON_4_ACTION_VIRTUAL_TEXT}")));
               if (toggle_relay && ${SL_RELAY_4_MODE} != 0)
                 sw_relay_4->toggle();
+              if (toggle_virtual) {
+                #if ${SL_RELAY_4_MODE} == 2
+                if (id(virtual_relay_4_state)) id(light_virtual_relay_4).turn_off().perform();
+                else id(light_virtual_relay_4).turn_on().perform();
+                #else
+                if (id(virtual_relay_4_state)) sw_virtual_relay_4->turn_off();
+                else sw_virtual_relay_4->turn_on();
+                #endif
+              }
               break;
           }
           if (toggle_relay) {
             ESP_LOGI("${TAG_HW_RELAYS}", "Toggle relay %" PRIu8 ": (%s)", button, select_state.c_str());
-          } else if (not select_state.empty()) {
-            ESP_LOGV("${TAG_HW_RELAYS}", "Ignoring toggle for relay %" PRIu8 ": action is '%s'",
+          }
+          if (toggle_virtual) {
+            ESP_LOGI("${TAG_HW_RELAYS}", "Toggle virtual relay %" PRIu8 ": (%s)",
                                         button, select_state.c_str());
-          } else {
-            ESP_LOGE("${TAG_HW_RELAYS}", "No button action selected for button %" PRIu8, button);
+          }
+          if (not toggle_relay and not toggle_virtual) {
+            if (not select_state.empty()) {
+              ESP_LOGV("${TAG_HW_RELAYS}", "Ignoring toggle for relay %" PRIu8 ": action is '%s'",
+                                          button, select_state.c_str());
+            } else {
+              ESP_LOGE("${TAG_HW_RELAYS}", "No button action selected for button %" PRIu8, button);
+            }
           }
 
   - id: !extend dump_config
@@ -545,6 +762,24 @@ script:
           #if TX_ULTIMATE_EASY_GANG_COUNT >= 4
           ESP_LOGCONFIG("${TAG_HW_RELAYS}", "  Relay 4: %s", sw_relay_4->state ? "ON" : "OFF");
           #endif  // TX_ULTIMATE_EASY_GANG_COUNT >= 4
+
+          // Virtual relays' states
+          #if TX_ULTIMATE_EASY_GANG_COUNT > 1
+          ESP_LOGCONFIG("${TAG_HW_RELAYS}", "Virtual relays states:");
+          #else
+          ESP_LOGCONFIG("${TAG_HW_RELAYS}", "Virtual relay state:");
+          #endif  // TX_ULTIMATE_EASY_GANG_COUNT > 1
+          ESP_LOGCONFIG("${TAG_HW_RELAYS}", "  Virtual Relay 1: %s", id(virtual_relay_1_state) ? "ON" : "OFF");
+          #if TX_ULTIMATE_EASY_GANG_COUNT >= 2
+          ESP_LOGCONFIG("${TAG_HW_RELAYS}", "  Virtual Relay 2: %s", id(virtual_relay_2_state) ? "ON" : "OFF");
+          #endif  // TX_ULTIMATE_EASY_GANG_COUNT >= 2
+          #if TX_ULTIMATE_EASY_GANG_COUNT >= 3
+          ESP_LOGCONFIG("${TAG_HW_RELAYS}", "  Virtual Relay 3: %s", id(virtual_relay_3_state) ? "ON" : "OFF");
+          #endif  // TX_ULTIMATE_EASY_GANG_COUNT >= 3
+          #if TX_ULTIMATE_EASY_GANG_COUNT >= 4
+          ESP_LOGCONFIG("${TAG_HW_RELAYS}", "  Virtual Relay 4: %s", id(virtual_relay_4_state) ? "ON" : "OFF");
+          #endif  // TX_ULTIMATE_EASY_GANG_COUNT >= 4
+          ESP_LOGCONFIG("${TAG_HW_RELAYS}", "Virtual relays exposed to Home Assistant: ${virtual_relays}");
           ESP_LOGCONFIG("${TAG_HW_RELAYS}", "Expose Relay's LEDs to Home Assistant: ${expose_relays_leds_to_ha}");
 
           // Boot initialization statuses
@@ -703,26 +938,41 @@ script:
                   ESP_LOGW("${TAG_HW_RELAYS}", "Relays not initialized yet");
                   return;
                 }
+                // The virtual state is only authoritative while Home Assistant
+                // can see it. Offline, the LEDs fall back to the physical relay
+                // (i.e. normal relay behaviour).
+                const bool api_connected = global_api_server->is_connected() and
+                                           wifi_component->is_connected();
                 for (uint8_t i = 0; i < ${gang_count}; i++) {
                   bool relay_state = false;
                   std::string light_mode;
 
-                  // Determine relay state and light mode
+                  // When the associated button action is a virtual relay and the
+                  // API is connected, the indicator LEDs follow the virtual state
+                  // instead of the physical relay.
                   switch (i) {
                     case 0:
-                      relay_state = id(relay_1_state);
+                      relay_state = (sl_button_1_action->active_index().value_or(1) == 3 and api_connected)
+                                        ? id(virtual_relay_1_state)
+                                        : id(relay_1_state);
                       light_mode = sl_relay_1_light_mode->current_option();
                       break;
                     case 1:
-                      relay_state = id(relay_2_state);
+                      relay_state = (sl_button_2_action->active_index().value_or(1) == 3 and api_connected)
+                                        ? id(virtual_relay_2_state)
+                                        : id(relay_2_state);
                       light_mode = sl_relay_2_light_mode->current_option();
                       break;
                     case 2:
-                      relay_state = id(relay_3_state);
+                      relay_state = (sl_button_3_action->active_index().value_or(1) == 3 and api_connected)
+                                        ? id(virtual_relay_3_state)
+                                        : id(relay_3_state);
                       light_mode = sl_relay_3_light_mode->current_option();
                       break;
                     case 3:
-                      relay_state = id(relay_4_state);
+                      relay_state = (sl_button_4_action->active_index().value_or(1) == 3 and api_connected)
+                                        ? id(virtual_relay_4_state)
+                                        : id(relay_4_state);
                       light_mode = sl_relay_4_light_mode->current_option();
                       break;
                   }
@@ -804,7 +1054,11 @@ select:
             // Transitioning FROM Disabled - update lights based on relay state
             ESP_LOGI("${TAG_HW_RELAYS}",
                       "Relay 1 light mode changed from ${LIGHT_MODE_DISABLED_TEXT} - updating lights");
-            bool relay_state = id(relay_1_state);
+            const bool api_connected = global_api_server->is_connected() and
+                                       wifi_component->is_connected();
+            bool relay_state = (sl_button_1_action->active_index().value_or(1) == 3 and api_connected)
+                                   ? id(virtual_relay_1_state)
+                                   : id(relay_1_state);
             if (current_mode == "${LIGHT_MODE_BOTTOM_OR_LEFT_TEXT}" || current_mode == "${LIGHT_MODE_BOTH_TEXT}") {
               id(light_set_state)->execute(1, 0, relay_state);
             }
@@ -843,7 +1097,11 @@ select:
             // Transitioning FROM Disabled - update lights based on relay state
             ESP_LOGI("${TAG_HW_RELAYS}",
                       "Relay 2 light mode changed from ${LIGHT_MODE_DISABLED_TEXT} - updating lights");
-            bool relay_state = id(relay_2_state);
+            const bool api_connected = global_api_server->is_connected() and
+                                       wifi_component->is_connected();
+            bool relay_state = (sl_button_2_action->active_index().value_or(1) == 3 and api_connected)
+                                   ? id(virtual_relay_2_state)
+                                   : id(relay_2_state);
             if (current_mode == "${LIGHT_MODE_BOTTOM_OR_LEFT_TEXT}" || current_mode == "${LIGHT_MODE_BOTH_TEXT}") {
               id(light_set_state)->execute(1, 1, relay_state);
             }
@@ -882,7 +1140,11 @@ select:
             // Transitioning FROM Disabled - update lights based on relay state
             ESP_LOGI("${TAG_HW_RELAYS}",
                       "Relay 3 light mode changed from ${LIGHT_MODE_DISABLED_TEXT} - updating lights");
-            bool relay_state = id(relay_3_state);
+            const bool api_connected = global_api_server->is_connected() and
+                                       wifi_component->is_connected();
+            bool relay_state = (sl_button_3_action->active_index().value_or(1) == 3 and api_connected)
+                                   ? id(virtual_relay_3_state)
+                                   : id(relay_3_state);
             if (current_mode == "${LIGHT_MODE_BOTTOM_OR_LEFT_TEXT}" || current_mode == "${LIGHT_MODE_BOTH_TEXT}") {
               id(light_set_state)->execute(1, 2, relay_state);
             }
@@ -919,7 +1181,11 @@ select:
           } else if (previous_mode == "${LIGHT_MODE_DISABLED_TEXT}" && current_mode != "${LIGHT_MODE_DISABLED_TEXT}") {
             // Transitioning FROM Disabled - update lights based on relay state
             ESP_LOGI("${TAG_HW_RELAYS}", "Relay 4 light mode changed from ${LIGHT_MODE_DISABLED_TEXT} - updating lights");
-            bool relay_state = id(relay_4_state);
+            const bool api_connected = global_api_server->is_connected() and
+                                       wifi_component->is_connected();
+            bool relay_state = (sl_button_4_action->active_index().value_or(1) == 3 and api_connected)
+                                   ? id(virtual_relay_4_state)
+                                   : id(relay_4_state);
             if (current_mode == "${LIGHT_MODE_BOTTOM_OR_LEFT_TEXT}" || current_mode == "${LIGHT_MODE_BOTH_TEXT}") {
               id(light_set_state)->execute(1, 3, relay_state);
             }
@@ -1063,4 +1329,107 @@ switch:
       - lambda: if (id(nr_pulse_4_time).state > 0) id(pulse_4_delay).execute();
     on_turn_off:
       - lambda: id(pulse_4_delay).stop();
+
+  # Virtual relays: state-only switches used for Home Assistant remapping.
+  # The entity type mirrors relay_N_mode, so only the variant matching the
+  # configured mode is exposed; the other one is internal and ignores its own
+  # actions so it cannot overwrite the active state at boot.
+  - id: sw_virtual_relay_1
+    name: Virtual Relay 1
+    internal: ${SL_RELAY_1_MODE == 2 or gang_count < 1 or not virtual_relays}
+    # Only the active variant restores from NVS. The inactive one must not,
+    # because both variants share the same entity name (and therefore NVS key)
+    # while storing different value sizes.
+    restore_mode: ${ RELAYS_SWITCH_RESTORE_MODE if SL_RELAY_1_MODE != 2 else "DISABLED" }
+    platform: template
+    lambda: |-
+      return id(virtual_relay_1_state);
+    turn_on_action:
+      - if:
+          condition:
+            lambda: return ${SL_RELAY_1_MODE} != 2;
+          then:
+            - lambda: |-
+                id(virtual_relay_1_state) = true;
+                show_relay_status->execute();
+    turn_off_action:
+      - if:
+          condition:
+            lambda: return ${SL_RELAY_1_MODE} != 2;
+          then:
+            - lambda: |-
+                id(virtual_relay_1_state) = false;
+                show_relay_status->execute();
+
+  - id: sw_virtual_relay_2
+    name: Virtual Relay 2
+    internal: ${SL_RELAY_2_MODE == 2 or gang_count < 2 or not virtual_relays}
+    restore_mode: ${ RELAYS_SWITCH_RESTORE_MODE if SL_RELAY_2_MODE != 2 else "DISABLED" }
+    platform: template
+    lambda: |-
+      return id(virtual_relay_2_state);
+    turn_on_action:
+      - if:
+          condition:
+            lambda: return ${SL_RELAY_2_MODE} != 2;
+          then:
+            - lambda: |-
+                id(virtual_relay_2_state) = true;
+                show_relay_status->execute();
+    turn_off_action:
+      - if:
+          condition:
+            lambda: return ${SL_RELAY_2_MODE} != 2;
+          then:
+            - lambda: |-
+                id(virtual_relay_2_state) = false;
+                show_relay_status->execute();
+
+  - id: sw_virtual_relay_3
+    name: Virtual Relay 3
+    internal: ${SL_RELAY_3_MODE == 2 or gang_count < 3 or not virtual_relays}
+    restore_mode: ${ RELAYS_SWITCH_RESTORE_MODE if SL_RELAY_3_MODE != 2 else "DISABLED" }
+    platform: template
+    lambda: |-
+      return id(virtual_relay_3_state);
+    turn_on_action:
+      - if:
+          condition:
+            lambda: return ${SL_RELAY_3_MODE} != 2;
+          then:
+            - lambda: |-
+                id(virtual_relay_3_state) = true;
+                show_relay_status->execute();
+    turn_off_action:
+      - if:
+          condition:
+            lambda: return ${SL_RELAY_3_MODE} != 2;
+          then:
+            - lambda: |-
+                id(virtual_relay_3_state) = false;
+                show_relay_status->execute();
+
+  - id: sw_virtual_relay_4
+    name: Virtual Relay 4
+    internal: ${SL_RELAY_4_MODE == 2 or gang_count < 4 or not virtual_relays}
+    restore_mode: ${ RELAYS_SWITCH_RESTORE_MODE if SL_RELAY_4_MODE != 2 else "DISABLED" }
+    platform: template
+    lambda: |-
+      return id(virtual_relay_4_state);
+    turn_on_action:
+      - if:
+          condition:
+            lambda: return ${SL_RELAY_4_MODE} != 2;
+          then:
+            - lambda: |-
+                id(virtual_relay_4_state) = true;
+                show_relay_status->execute();
+    turn_off_action:
+      - if:
+          condition:
+            lambda: return ${SL_RELAY_4_MODE} != 2;
+          then:
+            - lambda: |-
+                id(virtual_relay_4_state) = false;
+                show_relay_status->execute();
 ...

@@ -27,6 +27,10 @@ substitutions:
   BUTTON_2_ACTION_FAILSAFE_TEXT: "Relay 2 (API failsafe only)"
   BUTTON_3_ACTION_FAILSAFE_TEXT: "Relay 3 (API failsafe only)"
   BUTTON_4_ACTION_FAILSAFE_TEXT: "Relay 4 (API failsafe only)"
+  BUTTON_1_ACTION_VIRTUAL_TEXT: "Virtual Relay 1 (Relay API failsafe only)"
+  BUTTON_2_ACTION_VIRTUAL_TEXT: "Virtual Relay 2 (Relay API failsafe only)"
+  BUTTON_3_ACTION_VIRTUAL_TEXT: "Virtual Relay 3 (Relay API failsafe only)"
+  BUTTON_4_ACTION_VIRTUAL_TEXT: "Virtual Relay 4 (Relay API failsafe only)"
 
   BUTTON_MULTI_CLICK_DELAY: "250"  # The time to wait for another click, in msec
   BUTTON_PRESS_TIMEOUT: "10000"  # Ignore if button is pressed for longer than this time, in msec
@@ -76,7 +80,7 @@ globals:
     restore_value: true
     initial_value: '4369'  # Binary: 0001000100010001 = all buttons set to option 1 (default action)
     # Bit layout: [button4(4)][button3(4)][button2(4)][button1(4)]
-    # Each button uses 4 bits: 0=None, 1=Toggle, 2=Failsafe, 3-15=Reserved for future options
+    # Each button uses 4 bits: 0=None, 1=Toggle, 2=Failsafe, 3=Virtual (API failsafe), 4-15=Reserved
 
   - id: button_press_button
     type: uint8_t
@@ -302,16 +306,16 @@ script:
     then:
       - select.set_index:
           id: sl_button_1_action
-          index: !lambda return std::min((uint8_t)(id(button_actions_packed) & 0x0F), (uint8_t)2);
+          index: !lambda return std::min((uint8_t)(id(button_actions_packed) & 0x0F), (uint8_t)3);
       - select.set_index:
           id: sl_button_2_action
-          index: !lambda return std::min((uint8_t)((id(button_actions_packed) >> 4) & 0x0F), (uint8_t)2);
+          index: !lambda return std::min((uint8_t)((id(button_actions_packed) >> 4) & 0x0F), (uint8_t)3);
       - select.set_index:
           id: sl_button_3_action
-          index: !lambda return std::min((uint8_t)((id(button_actions_packed) >> 8) & 0x0F), (uint8_t)2);
+          index: !lambda return std::min((uint8_t)((id(button_actions_packed) >> 8) & 0x0F), (uint8_t)3);
       - select.set_index:
           id: sl_button_4_action
-          index: !lambda return std::min((uint8_t)((id(button_actions_packed) >> 12) & 0x0F), (uint8_t)2);
+          index: !lambda return std::min((uint8_t)((id(button_actions_packed) >> 12) & 0x0F), (uint8_t)3);
 
   - id: !extend touch_on_multi_touch_release
     then:
@@ -528,6 +532,7 @@ select:
       - "${BUTTON_ACTION_NONE_TEXT}"
       - "${BUTTON_1_ACTION_TEXT}"
       - "${BUTTON_1_ACTION_FAILSAFE_TEXT}"
+      - "${BUTTON_1_ACTION_VIRTUAL_TEXT}"
     initial_option: "${BUTTON_1_ACTION_TEXT}"
     internal: ${gang_count < 1}
     <<: *button_select_action_base
@@ -543,6 +548,7 @@ select:
       - "${BUTTON_ACTION_NONE_TEXT}"
       - "${BUTTON_2_ACTION_TEXT}"
       - "${BUTTON_2_ACTION_FAILSAFE_TEXT}"
+      - "${BUTTON_2_ACTION_VIRTUAL_TEXT}"
     initial_option: "${BUTTON_2_ACTION_TEXT}"
     internal: ${gang_count < 2}
     <<: *button_select_action_base
@@ -558,6 +564,7 @@ select:
       - "${BUTTON_ACTION_NONE_TEXT}"
       - "${BUTTON_3_ACTION_TEXT}"
       - "${BUTTON_3_ACTION_FAILSAFE_TEXT}"
+      - "${BUTTON_3_ACTION_VIRTUAL_TEXT}"
     initial_option: "${BUTTON_3_ACTION_TEXT}"
     internal: ${gang_count < 3}
     <<: *button_select_action_base
@@ -573,6 +580,7 @@ select:
       - "${BUTTON_ACTION_NONE_TEXT}"
       - "${BUTTON_4_ACTION_TEXT}"
       - "${BUTTON_4_ACTION_FAILSAFE_TEXT}"
+      - "${BUTTON_4_ACTION_VIRTUAL_TEXT}"
     initial_option: "${BUTTON_4_ACTION_TEXT}"
     internal: ${gang_count < 4}
     <<: *button_select_action_base

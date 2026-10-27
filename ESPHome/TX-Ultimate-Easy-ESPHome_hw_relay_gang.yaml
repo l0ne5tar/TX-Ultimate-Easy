@@ -1,0 +1,177 @@
+####################################################################################################
+#####                              TX Ultimate Easy for ESPHome                                #####
+#####                  Repository: https://github.com/edwardtfn/TX-Ultimate-Easy               #####
+####################################################################################################
+##### Purpose: ESPHome - Hardware - Relay Gang Template (included per gang 1..4)               #####
+####################################################################################################
+##### Author: edwardtfn - https://github.com/edwardtfn - https://buymeacoffee.com/edwardfirmo  #####
+####################################################################################################
+##### NOTE:                                                                                    #####
+##### - Make changes ONLY if absolutely necessary and you have the required knowledge.         #####
+##### - For normal system use, modifications to this file are NOT required.                    #####
+####################################################################################################
+---
+output:
+  - id: output_relay_${gang}
+    platform: gpio
+    pin: ${pin}
+
+light:
+  # Physical relay exposed as a light entity when relay_N_mode is 'light'
+  - id: light_output_${gang}
+    name: Light output ${gang}
+    output: output_relay_${gang}
+    platform: binary
+    internal: ${ [RELAY_1_MODE_LOWER, RELAY_2_MODE_LOWER, RELAY_3_MODE_LOWER, RELAY_4_MODE_LOWER][idx] != "light" or gang_count < gang }
+    restore_mode: ${ RELAYS_LIGHT_RESTORE_MODE if (gang_count >= gang and [RELAY_1_MODE_LOWER, RELAY_2_MODE_LOWER, RELAY_3_MODE_LOWER, RELAY_4_MODE_LOWER][idx] == "light") else "ALWAYS_OFF" }
+    on_turn_on:
+      then:
+        - lambda: |-
+            id(relay_states)[${idx}] = true;
+            show_relay_status->execute();
+    on_turn_off:
+      then:
+        - lambda: |-
+            id(relay_states)[${idx}] = false;
+            show_relay_status->execute();
+
+  # Virtual relay exposed as a light entity when relay_N_mode is 'light'.
+  # Virtual relays are state-only: they never drive a physical relay.
+  # Only the variant matching the configured mode restores from NVS and reacts
+  # to its own actions; the other variant is internal and ignores them so it
+  # cannot overwrite the active state at boot.
+  - id: light_virtual_relay_${gang}
+    name: Virtual Relay ${gang}
+    output: output_virtual_relays
+    platform: binary
+    internal: ${ [RELAY_1_MODE_LOWER, RELAY_2_MODE_LOWER, RELAY_3_MODE_LOWER, RELAY_4_MODE_LOWER][idx] != "light" or gang_count < gang }
+    restore_mode: ${ RELAYS_LIGHT_RESTORE_MODE if (gang_count >= gang and [RELAY_1_MODE_LOWER, RELAY_2_MODE_LOWER, RELAY_3_MODE_LOWER, RELAY_4_MODE_LOWER][idx] == "light") else "ALWAYS_OFF" }
+    on_turn_on:
+      then:
+        - if:
+            condition:
+              lambda: return ${ 1 if (gang_count >= gang and [RELAY_1_MODE_LOWER, RELAY_2_MODE_LOWER, RELAY_3_MODE_LOWER, RELAY_4_MODE_LOWER][idx] == "light") else 0 };
+            then:
+              - lambda: |-
+                  id(virtual_relay_states)[${idx}] = true;
+                  show_relay_status->execute();
+    on_turn_off:
+      then:
+        - if:
+            condition:
+              lambda: return ${ 1 if (gang_count >= gang and [RELAY_1_MODE_LOWER, RELAY_2_MODE_LOWER, RELAY_3_MODE_LOWER, RELAY_4_MODE_LOWER][idx] == "light") else 0 };
+            then:
+              - lambda: |-
+                  id(virtual_relay_states)[${idx}] = false;
+                  show_relay_status->execute();
+
+script:
+  - id: pulse_${gang}_delay
+    mode: restart
+    then:
+      - delay: !lambda 'return id(nr_pulse_${gang}_time).state * 1000;'
+      - lambda: |-
+          using esphome::tx_ultimate_easy::RelayMode;
+          constexpr auto mode = static_cast<RelayMode>(
+              ${ [SL_RELAY_1_MODE, SL_RELAY_2_MODE, SL_RELAY_3_MODE, SL_RELAY_4_MODE][idx] });
+          if (mode == RelayMode::Light) {
+            id(light_output_${gang}).turn_off().perform();
+          } else if (mode == RelayMode::Switch) {
+            id(sw_relay_${gang}).turn_off();
+          }
+
+select:
+  - id: sl_relay_${gang}_light_mode
+    name: Relay ${gang} light mode
+    platform: template
+    options:
+      - "${LIGHT_MODE_DISABLED_TEXT}"
+      - "${LIGHT_MODE_BOTTOM_OR_LEFT_TEXT}"
+      - "${LIGHT_MODE_TOP_OR_RIGHT_TEXT}"
+      - "${LIGHT_MODE_BOTH_TEXT}"
+    initial_option: "${LIGHT_MODE_BOTTOM_OR_LEFT_TEXT}"
+    optimistic: true
+    disabled_by_default: false
+    entity_category: config
+    icon: mdi:dots-square
+    restore_value: ${gang_count >= gang}
+    internal: ${gang_count < gang}
+    on_value:
+      - script.execute: show_relay_status
+
+number:
+  - platform: template
+    id: nr_pulse_${gang}_time
+    name: "Relay ${gang} Pulse Time"
+    initial_value: ${ [relay_1_pulse_time, relay_2_pulse_time, relay_3_pulse_time, relay_4_pulse_time][idx] }
+    restore_value: ${ [RELAY_1_MODE_LOWER, RELAY_2_MODE_LOWER, RELAY_3_MODE_LOWER, RELAY_4_MODE_LOWER][idx] == "switch" and gang_count >= gang }
+    internal: ${ [RELAY_1_MODE_LOWER, RELAY_2_MODE_LOWER, RELAY_3_MODE_LOWER, RELAY_4_MODE_LOWER][idx] != "switch" or gang_count < gang or pulse_time_internal }
+    optimistic: true
+    device_class: 'duration'
+    entity_category: 'config'
+    unit_of_measurement: 's'
+    icon: 'mdi:clock-end'
+    mode: box
+    min_value: 0
+    max_value: 3600
+    step: 1
+    on_value_range:
+      below: 1
+      then:
+        - script.stop: pulse_${gang}_delay
+
+switch:
+  # Physical relay exposed as a switch entity when relay_N_mode is 'switch'
+  - id: sw_relay_${gang}
+    name: Relay ${gang}
+    internal: ${ [RELAY_1_MODE_LOWER, RELAY_2_MODE_LOWER, RELAY_3_MODE_LOWER, RELAY_4_MODE_LOWER][idx] != "switch" or gang_count < gang }
+    restore_mode: >-
+      ${ RELAYS_SWITCH_RESTORE_MODE
+      if (gang_count >= gang and [RELAY_1_MODE_LOWER, RELAY_2_MODE_LOWER, RELAY_3_MODE_LOWER, RELAY_4_MODE_LOWER][idx] == "switch")
+      else ("DISABLED" if [RELAY_1_MODE_LOWER, RELAY_2_MODE_LOWER, RELAY_3_MODE_LOWER, RELAY_4_MODE_LOWER][idx] == "light" else "ALWAYS_OFF") }
+    platform: template
+    lambda: |-
+      return id(relay_states)[${idx}];
+    turn_on_action:
+      - lambda: id(relay_states)[${idx}] = true;
+      - light.turn_on: light_output_${gang}
+      - lambda: if (id(pulse_${gang}_delay).is_running()) id(pulse_${gang}_delay).execute();
+    turn_off_action:
+      - lambda: id(relay_states)[${idx}] = false;
+      - light.turn_off: light_output_${gang}
+    on_turn_on:
+      - lambda: |-
+          using esphome::tx_ultimate_easy::RelayMode;
+          constexpr auto mode = static_cast<RelayMode>(
+              ${ [SL_RELAY_1_MODE, SL_RELAY_2_MODE, SL_RELAY_3_MODE, SL_RELAY_4_MODE][idx] });
+          if (mode == RelayMode::Switch and id(nr_pulse_${gang}_time).state > 0) {
+            id(pulse_${gang}_delay).execute();
+          }
+    on_turn_off:
+      - lambda: id(pulse_${gang}_delay).stop();
+
+  # Virtual relay exposed as a switch entity when relay_N_mode is not 'light'
+  - id: sw_virtual_relay_${gang}
+    name: Virtual Relay ${gang}
+    internal: ${ [RELAY_1_MODE_LOWER, RELAY_2_MODE_LOWER, RELAY_3_MODE_LOWER, RELAY_4_MODE_LOWER][idx] == "light" or gang_count < gang }
+    restore_mode: ${ RELAYS_SWITCH_RESTORE_MODE if (gang_count >= gang and [RELAY_1_MODE_LOWER, RELAY_2_MODE_LOWER, RELAY_3_MODE_LOWER, RELAY_4_MODE_LOWER][idx] != "light") else "DISABLED" }
+    platform: template
+    lambda: |-
+      return id(virtual_relay_states)[${idx}];
+    turn_on_action:
+      - if:
+          condition:
+            lambda: return ${ 1 if (gang_count >= gang and [RELAY_1_MODE_LOWER, RELAY_2_MODE_LOWER, RELAY_3_MODE_LOWER, RELAY_4_MODE_LOWER][idx] != "light") else 0 };
+          then:
+            - lambda: |-
+                id(virtual_relay_states)[${idx}] = true;
+                show_relay_status->execute();
+    turn_off_action:
+      - if:
+          condition:
+            lambda: return ${ 1 if (gang_count >= gang and [RELAY_1_MODE_LOWER, RELAY_2_MODE_LOWER, RELAY_3_MODE_LOWER, RELAY_4_MODE_LOWER][idx] != "light") else 0 };
+          then:
+            - lambda: |-
+                id(virtual_relay_states)[${idx}] = false;
+                show_relay_status->execute();
+...

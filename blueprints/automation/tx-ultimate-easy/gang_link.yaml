@@ -56,12 +56,18 @@ trigger:
     id: reconnect_virtual
   - platform: state
     entity_id: !input physical_entity
+    not_from:
+      - unavailable
+      - unknown
     to:
       - "on"
       - "off"
     id: change_physical
   - platform: state
     entity_id: !input virtual_entities
+    not_from:
+      - unavailable
+      - unknown
     to:
       - "on"
       - "off"
@@ -70,16 +76,27 @@ trigger:
 condition:
   - condition: template
     value_template: "{{ states(physical) in ['on', 'off'] }}"
+  # Ignore state changes caused by this automation's own service calls (or any
+  # automation driving a virtual relay) to prevent echo amplification and bounce.
+  - condition: template
+    value_template: >-
+      {% set self_ctx = context.id if (context is defined and context.id is defined) else '' %}
+      {{ trigger.id not in ['change_physical', 'change_virtual']
+         or (
+           trigger.to_state.context.id != self_ctx
+           and trigger.to_state.context.parent_id != self_ctx
+           and (trigger.id != 'change_virtual' or trigger.to_state.context.parent_id is none)
+         ) }}
 
 mode: queued
-max: 10
-max_exceeded: silent
+max: 20
+max_exceeded: warning
 
 action:
   - variables:
       # Reconnects and initialisation always follow the physical relay.
       # A deliberate state change follows the panel that changed.
-      desired: >
+      desired: >-
         {% if trigger is defined and trigger.platform == 'state'
               and trigger.from_state is not none
               and trigger.from_state.state in ['unavailable', 'unknown'] %}
@@ -90,7 +107,7 @@ action:
         {% else %}
           {{ states(physical) }}
         {% endif %}
-      all_entities: >
+      all_entities: >-
         {{ [physical] + (virtuals if (virtuals is not string
             and virtuals is sequence) else [virtuals]) }}
   - repeat:
@@ -100,8 +117,12 @@ action:
             - condition: template
               value_template: >-
                 {{ states(repeat.item) not in ['unavailable', 'unknown']
-                   and states(repeat.item) != desired }}
+                   and (
+                     states(repeat.item) != desired
+                     or (trigger.id in ['change_physical', 'change_virtual']
+                         and repeat.item != trigger.entity_id)
+                   ) }}
           then:
-            - service: "homeassistant.turn_{{ desired }}"
+            - action: "homeassistant.turn_{{ desired }}"
               target:
                 entity_id: "{{ repeat.item }}"

@@ -1,2 +1,5 @@
 *.cmd
 *.bat
+
+__pycache__/
+*.pyc

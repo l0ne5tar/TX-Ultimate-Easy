@@ -91,10 +91,10 @@ esphome:
     - -D TX_ULTIMATE_EASY_ESPNOW_BUTTON_2_MAC_DEFINED=${ 0 if espnow_target_mac_button_2 == '00:00:00:00:00:00' else 1 }
     - -D TX_ULTIMATE_EASY_ESPNOW_BUTTON_3_MAC_DEFINED=${ 0 if espnow_target_mac_button_3 == '00:00:00:00:00:00' else 1 }
     - -D TX_ULTIMATE_EASY_ESPNOW_BUTTON_4_MAC_DEFINED=${ 0 if espnow_target_mac_button_4 == '00:00:00:00:00:00' else 1 }
-    - -D TX_ULTIMATE_EASY_ESPNOW_BUTTON_1_MAC_INVALID=${ 0 if ESPNOW_BUTTON_1_MAC_VALID else 1 }
-    - -D TX_ULTIMATE_EASY_ESPNOW_BUTTON_2_MAC_INVALID=${ 0 if ESPNOW_BUTTON_2_MAC_VALID else 1 }
-    - -D TX_ULTIMATE_EASY_ESPNOW_BUTTON_3_MAC_INVALID=${ 0 if ESPNOW_BUTTON_3_MAC_VALID else 1 }
-    - -D TX_ULTIMATE_EASY_ESPNOW_BUTTON_4_MAC_INVALID=${ 0 if ESPNOW_BUTTON_4_MAC_VALID else 1 }
+    - -D TX_ULTIMATE_EASY_ESPNOW_BUTTON_1_MAC_INVALID=${ 0 if ESPNOW_BUTTON_1_MAC_VALID == '1' else 1 }
+    - -D TX_ULTIMATE_EASY_ESPNOW_BUTTON_2_MAC_INVALID=${ 0 if ESPNOW_BUTTON_2_MAC_VALID == '1' else 1 }
+    - -D TX_ULTIMATE_EASY_ESPNOW_BUTTON_3_MAC_INVALID=${ 0 if ESPNOW_BUTTON_3_MAC_VALID == '1' else 1 }
+    - -D TX_ULTIMATE_EASY_ESPNOW_BUTTON_4_MAC_INVALID=${ 0 if ESPNOW_BUTTON_4_MAC_VALID == '1' else 1 }
 
 espnow:
   id: espnow_component
@@ -336,7 +336,7 @@ script:
                   case 1:  // Always
                     return true;
                   case 2:  // API failsafe only
-                    return !global_api_server->is_connected() || !wifi_component->is_connected();
+                    return !global_api_server->is_connected_with_state_subscription() || !wifi_component->is_connected();
                   default:  // Off
                     return false;
                 }

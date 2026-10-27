@@ -16,6 +16,26 @@
 namespace esphome {
 namespace tx_ultimate_easy {
 
+enum class RelayMode : uint8_t {
+  Disabled = 0,
+  Switch = 1,
+  Light = 2,
+};
+
+enum class ButtonAction : size_t {
+  None = 0,
+  RelayToggle = 1,
+  RelayFailsafe = 2,
+  VirtualRelay = 3,
+};
+
+enum class RelayLightMode : size_t {
+  Disabled = 0,
+  BottomOrLeft = 1,
+  TopOrRight = 2,
+  Both = 3,
+};
+
 // Cached device name to avoid repeated lookups and string copies
 extern std::string cached_device_name;
 

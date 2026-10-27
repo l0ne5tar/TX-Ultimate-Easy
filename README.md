@@ -174,14 +174,6 @@ device needing to know the mapping. Typical uses:
 - **Scene/automation buttons**: let a button drive an arbitrary Home Assistant action while keeping the
   panel's indicator LEDs in sync
 
-They are enabled by default and can be hidden with the `virtual_relays` substitution. The button action
-keeps working locally when the entities are hidden:
-
-```yaml
-substitutions:
-  virtual_relays: false   # hide the Virtual Relay entities from Home Assistant
-```
-
 **Behaviour:**
 
 | Button action | API/Wi-Fi connected | API/Wi-Fi disconnected |

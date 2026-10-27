@@ -33,17 +33,22 @@ to keep spare gangs in sync with a real load.
   state, that new state is propagated to all the others. Only the panel that was
   actually touched needs to provide local feedback (sound/vibration); the
   Home Assistant propagation only updates state and LEDs.
-- **Loop safety** — an entity is only written when its current state differs
-  from the target state, so propagation terminates naturally.
+- **Loop safety** — state changes caused by the automation's own service calls
+  (or other automations driving virtual relays) are filtered out via Home
+  Assistant's event context (`context.id` / `context.parent_id`), preventing
+  echo loops and rapid-toggle bounce.
 
 ### Notes
 
 - All entities are written through `homeassistant.turn_on`/`turn_off`, which
   works across both `switch` and `light` domains (binary only — brightness and
   transitions are not handled).
+- External automations, scripts, and scenes should target the **physical relay**
+  entity (the source of truth), which will then propagate to all linked virtual
+  relays.
 - A panel that reconnects too quickly for Home Assistant to mark it
   `unavailable` may not trigger the reconnect sync. In that case use the
   automation's manual **Run** button (or reload the automation) to re-sync.
 - Selecting a non-virtual physical relay as a linked entity is allowed, but it
   will be driven like any other member of the group.
-- The automation runs in `queued` mode with a limit of 10 overlapping runs.
+- The automation runs in `queued` mode with a limit of 20 overlapping runs.

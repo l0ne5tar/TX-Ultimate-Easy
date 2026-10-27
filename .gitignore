@@ -3,3 +3,8 @@
 
 __pycache__/
 *.pyc
+
+# ESPHome build cache
+.esphome/
+
+.test/simulation/

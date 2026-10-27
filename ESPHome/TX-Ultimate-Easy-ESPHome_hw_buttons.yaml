@@ -18,20 +18,6 @@ substitutions:
   INSTANT_CLICK_MODE_ACTIVE: ${ 1 if instant_click_mode else 0 }
   INSTANT_CLICK_DEBOUNCE_MS: "500"  # Debounce window per button, instant click mode only, in msec
 
-  BUTTON_ACTION_NONE_TEXT: "None"
-  BUTTON_1_ACTION_TEXT: "Relay 1 (toggle)"
-  BUTTON_2_ACTION_TEXT: "Relay 2 (toggle)"
-  BUTTON_3_ACTION_TEXT: "Relay 3 (toggle)"
-  BUTTON_4_ACTION_TEXT: "Relay 4 (toggle)"
-  BUTTON_1_ACTION_FAILSAFE_TEXT: "Relay 1 (API failsafe only)"
-  BUTTON_2_ACTION_FAILSAFE_TEXT: "Relay 2 (API failsafe only)"
-  BUTTON_3_ACTION_FAILSAFE_TEXT: "Relay 3 (API failsafe only)"
-  BUTTON_4_ACTION_FAILSAFE_TEXT: "Relay 4 (API failsafe only)"
-  BUTTON_1_ACTION_VIRTUAL_TEXT: "Virtual Relay 1 (Relay API failsafe only)"
-  BUTTON_2_ACTION_VIRTUAL_TEXT: "Virtual Relay 2 (Relay API failsafe only)"
-  BUTTON_3_ACTION_VIRTUAL_TEXT: "Virtual Relay 3 (Relay API failsafe only)"
-  BUTTON_4_ACTION_VIRTUAL_TEXT: "Virtual Relay 4 (Relay API failsafe only)"
-
   BUTTON_MULTI_CLICK_DELAY: "250"  # The time to wait for another click, in msec
   BUTTON_PRESS_TIMEOUT: "10000"  # Ignore if button is pressed for longer than this time, in msec
   BUTTON_LONG_PRESS_DELAY: "500"  # The time to wait to consider a long press, in msec
@@ -74,14 +60,6 @@ esphome:
     - -D TX_ULTIMATE_EASY_HW_BUTTONS
 
 globals:
-  # Packed button actions - replaces 4 separate selects
-  - id: button_actions_packed
-    type: uint16_t
-    restore_value: true
-    initial_value: '4369'  # Binary: 0001000100010001 = all buttons set to option 1 (default action)
-    # Bit layout: [button4(4)][button3(4)][button2(4)][button1(4)]
-    # Each button uses 4 bits: 0=None, 1=Toggle, 2=Failsafe, 3=Virtual (API failsafe), 4-15=Reserved
-
   - id: button_press_button
     type: uint8_t
     restore_value: false
@@ -252,38 +230,6 @@ script:
   - id: !extend dump_config
     then:
       - lambda: |-
-          std::string gang_count_plural_suffix = ${gang_count} > 1 ? "s" : "";
-          // Button's actions
-          ESP_LOGCONFIG("${TAG_HW_BUTTONS}", "Button%s action%s:",
-                        gang_count_plural_suffix.c_str(),
-                        gang_count_plural_suffix.c_str());
-          ESP_LOGCONFIG("${TAG_HW_BUTTONS}", "  Relay 1: %s", sl_button_1_action->has_state() ?
-          #if ESPHOME_VERSION_CODE >= VERSION_CODE(2026, 0, 0)  // Code for ESPHome newer than v2026.0.0
-                                                              sl_button_1_action->current_option().c_str() : "Unknown");
-          #else
-                                                              sl_button_1_action->current_option() : "Unknown");
-          #endif
-          if (${gang_count} >= 2)
-            ESP_LOGCONFIG("${TAG_HW_BUTTONS}", "  Relay 2: %s", sl_button_2_action->has_state() ?
-            #if ESPHOME_VERSION_CODE >= VERSION_CODE(2026, 0, 0)  // Code for ESPHome newer than v2026.0.0
-                                                                sl_button_2_action->current_option().c_str() : "Unknown");
-            #else
-                                                                sl_button_2_action->current_option() : "Unknown");
-            #endif
-          if (${gang_count} >= 3)
-            ESP_LOGCONFIG("${TAG_HW_BUTTONS}", "  Relay 3: %s", sl_button_3_action->has_state() ?
-            #if ESPHOME_VERSION_CODE >= VERSION_CODE(2026, 0, 0)  // Code for ESPHome newer than v2026.0.0
-                                                                sl_button_3_action->current_option().c_str() : "Unknown");
-            #else
-                                                                sl_button_3_action->current_option() : "Unknown");
-            #endif
-          if (${gang_count} >= 4)
-            ESP_LOGCONFIG("${TAG_HW_BUTTONS}", "  Relay 4: %s", sl_button_4_action->has_state() ?
-            #if ESPHOME_VERSION_CODE >= VERSION_CODE(2026, 0, 0)  // Code for ESPHome newer than v2026.0.0
-                                                                sl_button_4_action->current_option().c_str() : "Unknown");
-            #else
-                                                                sl_button_4_action->current_option() : "Unknown");
-            #endif
           #if INSTANT_CLICK_MODE_ACTIVE
           ESP_LOGCONFIG("${TAG_HW_BUTTONS}", "Instant click mode ON - clicks fire on press");
           #else   // INSTANT_CLICK_MODE_ACTIVE
@@ -301,21 +247,6 @@ script:
 
           // Identify itself
           ESP_LOGCONFIG(ESPHOME_PROJECT_NAME, "  - Hardware - Buttons");
-
-  - id: !extend restore_from_nvs
-    then:
-      - select.set_index:
-          id: sl_button_1_action
-          index: !lambda return std::min((uint8_t)(id(button_actions_packed) & 0x0F), (uint8_t)3);
-      - select.set_index:
-          id: sl_button_2_action
-          index: !lambda return std::min((uint8_t)((id(button_actions_packed) >> 4) & 0x0F), (uint8_t)3);
-      - select.set_index:
-          id: sl_button_3_action
-          index: !lambda return std::min((uint8_t)((id(button_actions_packed) >> 8) & 0x0F), (uint8_t)3);
-      - select.set_index:
-          id: sl_button_4_action
-          index: !lambda return std::min((uint8_t)((id(button_actions_packed) >> 12) & 0x0F), (uint8_t)3);
 
   - id: !extend touch_on_multi_touch_release
     then:
@@ -516,81 +447,3 @@ script:
   - id: !extend touch_swipe_${ID_SWIPE_RIGHT_OR_DOWN_TEXT}
     then:
       - script.execute: buttons_reset_state
-
-.button_select_action_base: &button_select_action_base
-  platform: template
-  optimistic: true
-  restore_value: false
-  disabled_by_default: false
-  entity_category: config
-  icon: mdi:dip-switch
-
-select:
-  - id: sl_button_1_action
-    name: Button 1 action
-    options:
-      - "${BUTTON_ACTION_NONE_TEXT}"
-      - "${BUTTON_1_ACTION_TEXT}"
-      - "${BUTTON_1_ACTION_FAILSAFE_TEXT}"
-      - "${BUTTON_1_ACTION_VIRTUAL_TEXT}"
-    initial_option: "${BUTTON_1_ACTION_TEXT}"
-    internal: ${gang_count < 1}
-    <<: *button_select_action_base
-    on_value:
-      then:
-        - lambda: |-
-            id(button_actions_packed) = (id(button_actions_packed) & ~(0x0F << 0)) |
-                                        ((id(sl_button_1_action).active_index().value_or(1) & 0x0F) << 0);
-        - script.execute: show_relay_status
-
-  - id: sl_button_2_action
-    name: Button 2 action
-    options:
-      - "${BUTTON_ACTION_NONE_TEXT}"
-      - "${BUTTON_2_ACTION_TEXT}"
-      - "${BUTTON_2_ACTION_FAILSAFE_TEXT}"
-      - "${BUTTON_2_ACTION_VIRTUAL_TEXT}"
-    initial_option: "${BUTTON_2_ACTION_TEXT}"
-    internal: ${gang_count < 2}
-    <<: *button_select_action_base
-    on_value:
-      then:
-        - lambda: |-
-            id(button_actions_packed) = (id(button_actions_packed) & ~(0x0F << 4)) |
-                                        ((id(sl_button_2_action).active_index().value_or(1) & 0x0F) << 4);
-        - script.execute: show_relay_status
-
-  - id: sl_button_3_action
-    name: Button 3 action
-    options:
-      - "${BUTTON_ACTION_NONE_TEXT}"
-      - "${BUTTON_3_ACTION_TEXT}"
-      - "${BUTTON_3_ACTION_FAILSAFE_TEXT}"
-      - "${BUTTON_3_ACTION_VIRTUAL_TEXT}"
-    initial_option: "${BUTTON_3_ACTION_TEXT}"
-    internal: ${gang_count < 3}
-    <<: *button_select_action_base
-    on_value:
-      then:
-        - lambda: |-
-            id(button_actions_packed) = (id(button_actions_packed) & ~(0x0F << 8)) |
-                                        ((id(sl_button_3_action).active_index().value_or(1) & 0x0F) << 8);
-        - script.execute: show_relay_status
-
-  - id: sl_button_4_action
-    name: Button 4 action
-    options:
-      - "${BUTTON_ACTION_NONE_TEXT}"
-      - "${BUTTON_4_ACTION_TEXT}"
-      - "${BUTTON_4_ACTION_FAILSAFE_TEXT}"
-      - "${BUTTON_4_ACTION_VIRTUAL_TEXT}"
-    initial_option: "${BUTTON_4_ACTION_TEXT}"
-    internal: ${gang_count < 4}
-    <<: *button_select_action_base
-    on_value:
-      then:
-        - lambda: |-
-            id(button_actions_packed) = (id(button_actions_packed) & ~(0x0F << 12)) |
-                                        ((id(sl_button_4_action).active_index().value_or(1) & 0x0F) << 12);
-        - script.execute: show_relay_status
-...

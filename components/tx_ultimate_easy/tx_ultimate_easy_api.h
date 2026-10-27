@@ -22,6 +22,14 @@ enum class RelayMode : uint8_t {
   Light = 2,
 };
 
+enum class GangMode : uint8_t {
+  Disabled = 0,
+  Relay = 1,                 // Standard physical relay
+  VirtualRelay = 2,          // Smart bulb (button toggles virtual, failsafe offline)
+  DetachedRelay = 3,         // Button detached; HA controls relay; LED shows relay
+  DetachedVirtualRelay = 4,  // Button detached; HA controls virtual; LED shows status
+};
+
 enum class ButtonAction : size_t {
   None = 0,
   RelayToggle = 1,

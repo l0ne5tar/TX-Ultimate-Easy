@@ -452,12 +452,12 @@ script:
             return;
           }
 
-          using esphome::tx_ultimate_easy::ButtonAction;
+          using esphome::tx_ultimate_easy::GangMode;
           using esphome::tx_ultimate_easy::RelayMode;
 
           const uint8_t idx = button - 1;
-          esphome::select::Select *const button_actions[4] = {
-              sl_button_1_action, sl_button_2_action, sl_button_3_action, sl_button_4_action};
+          esphome::select::Select *const gang_modes[4] = {
+              sl_gang_1_mode, sl_gang_2_mode, sl_gang_3_mode, sl_gang_4_mode};
           static constexpr RelayMode relay_modes[4] = {
               static_cast<RelayMode>(${SL_RELAY_1_MODE}),
               static_cast<RelayMode>(${SL_RELAY_2_MODE}),
@@ -473,48 +473,51 @@ script:
           esphome::switch_::Switch *const virtual_relay_switches[4] = {
               sw_virtual_relay_1, sw_virtual_relay_2, sw_virtual_relay_3, sw_virtual_relay_4};
 
-          const std::string select_state = button_actions[idx]->current_option();
-          const auto action = static_cast<ButtonAction>(button_actions[idx]->active_index().value_or(0));
-          // Offline, a virtual action behaves exactly like Relay (toggle).
-          const bool toggle_virtual = (action == ButtonAction::VirtualRelay) and not api_disconnected;
-          const bool toggle_relay = (relay_modes[idx] != RelayMode::Disabled) and
-                                    ((action == ButtonAction::RelayToggle) or
-                                     (api_disconnected and
-                                      (action == ButtonAction::RelayFailsafe or
-                                       action == ButtonAction::VirtualRelay)));
+          auto toggle_physical = [&](uint8_t i) {
+            if (relay_modes[i] == RelayMode::Light) {
+              if (id(relay_states)[i]) relay_lights[i]->turn_off().perform();
+              else relay_lights[i]->turn_on().perform();
+            } else {
+              if (id(relay_states)[i]) relay_switches[i]->turn_off();
+              else relay_switches[i]->turn_on();
+            }
+          };
 
-          if (toggle_relay) {
-            if (relay_modes[idx] == RelayMode::Light) {
-              if (id(relay_states)[idx]) relay_lights[idx]->turn_off().perform();
-              else relay_lights[idx]->turn_on().perform();
+          auto toggle_virtual = [&](uint8_t i) {
+            if (relay_modes[i] == RelayMode::Light) {
+              if (id(virtual_relay_states)[i]) virtual_relay_lights[i]->turn_off().perform();
+              else virtual_relay_lights[i]->turn_on().perform();
             } else {
-              if (id(relay_states)[idx]) relay_switches[idx]->turn_off();
-              else relay_switches[idx]->turn_on();
+              if (id(virtual_relay_states)[i]) virtual_relay_switches[i]->turn_off();
+              else virtual_relay_switches[i]->turn_on();
             }
-          }
-          if (toggle_virtual) {
-            if (relay_modes[idx] == RelayMode::Light) {
-              if (id(virtual_relay_states)[idx]) virtual_relay_lights[idx]->turn_off().perform();
-              else virtual_relay_lights[idx]->turn_on().perform();
-            } else {
-              if (id(virtual_relay_states)[idx]) virtual_relay_switches[idx]->turn_off();
-              else virtual_relay_switches[idx]->turn_on();
-            }
-          }
-          if (toggle_relay) {
-            ESP_LOGI("${TAG_HW_RELAYS}", "Toggle relay %" PRIu8 ": (%s)", button, select_state.c_str());
-          }
-          if (toggle_virtual) {
-            ESP_LOGI("${TAG_HW_RELAYS}", "Toggle virtual relay %" PRIu8 ": (%s)",
-                                        button, select_state.c_str());
-          }
-          if (not toggle_relay and not toggle_virtual) {
-            if (not select_state.empty()) {
-              ESP_LOGV("${TAG_HW_RELAYS}", "Ignoring toggle for relay %" PRIu8 ": action is '%s'",
-                                          button, select_state.c_str());
-            } else {
-              ESP_LOGE("${TAG_HW_RELAYS}", "No button action selected for button %" PRIu8, button);
-            }
+          };
+
+          const auto mode = static_cast<GangMode>(gang_modes[idx]->active_index().value_or(1));
+          switch (mode) {
+            case GangMode::Relay:
+              toggle_physical(idx);
+              ESP_LOGI("${TAG_HW_RELAYS}", "Toggle relay %" PRIu8, button);
+              break;
+
+            case GangMode::VirtualRelay:
+              if (!api_disconnected) {
+                toggle_virtual(idx);
+                ESP_LOGI("${TAG_HW_RELAYS}", "Toggle virtual relay %" PRIu8, button);
+              } else {
+                toggle_physical(idx);
+                ESP_LOGI("${TAG_HW_RELAYS}", "Toggle relay %" PRIu8 " (offline failsafe)", button);
+              }
+              break;
+
+            case GangMode::DetachedRelay:
+            case GangMode::DetachedVirtualRelay:
+              ESP_LOGV("${TAG_HW_RELAYS}", "Button %" PRIu8 " is detached; event fired to HA only", button);
+              break;
+
+            case GangMode::Disabled:
+              ESP_LOGV("${TAG_HW_RELAYS}", "Gang %" PRIu8 " is disabled; ignoring press", button);
+              return;
           }
 
   - id: !extend dump_config
@@ -522,17 +525,20 @@ script:
       - lambda: |-
           const char *const relay_modes[4] = {
               "${relay_1_mode}", "${relay_2_mode}", "${relay_3_mode}", "${relay_4_mode}"};
+          esphome::select::Select *const gang_modes[4] = {
+              sl_gang_1_mode, sl_gang_2_mode, sl_gang_3_mode, sl_gang_4_mode};
           esphome::select::Select *const light_modes[4] = {
               sl_relay_1_light_mode, sl_relay_2_light_mode, sl_relay_3_light_mode, sl_relay_4_light_mode};
 
-          // Relay's modes
+          // Gang's modes
           #if TX_ULTIMATE_EASY_GANG_COUNT > 1
-          ESP_LOGCONFIG("${TAG_HW_RELAYS}", "Relays modes:");
+          ESP_LOGCONFIG("${TAG_HW_RELAYS}", "Gang modes:");
           #else
-          ESP_LOGCONFIG("${TAG_HW_RELAYS}", "Relay mode:");
+          ESP_LOGCONFIG("${TAG_HW_RELAYS}", "Gang mode:");
           #endif
           for (uint8_t i = 0; i < ${gang_count}; i++) {
-            ESP_LOGCONFIG("${TAG_HW_RELAYS}", "  Relay %" PRIu8 ": %s", i + 1, relay_modes[i]);
+            ESP_LOGCONFIG("${TAG_HW_RELAYS}", "  Gang %" PRIu8 ": %s (type: %s)",
+                          i + 1, gang_modes[i]->current_option().c_str(), relay_modes[i]);
           }
 
           // Relay's states
@@ -656,7 +662,7 @@ script:
                   }
                 };
 
-                using esphome::tx_ultimate_easy::ButtonAction;
+                using esphome::tx_ultimate_easy::GangMode;
                 using esphome::tx_ultimate_easy::RelayLightMode;
 
                 // The virtual state is only authoritative while Home Assistant
@@ -664,24 +670,38 @@ script:
                 // (i.e. normal relay behaviour).
                 const bool api_connected = global_api_server->is_connected_with_state_subscription() and
                                            wifi_component->is_connected();
-                esphome::select::Select *const button_actions[4] = {
-                    sl_button_1_action, sl_button_2_action, sl_button_3_action, sl_button_4_action};
+                esphome::select::Select *const gang_modes[4] = {
+                    sl_gang_1_mode, sl_gang_2_mode, sl_gang_3_mode, sl_gang_4_mode};
                 esphome::select::Select *const light_modes[4] = {
                     sl_relay_1_light_mode, sl_relay_2_light_mode, sl_relay_3_light_mode, sl_relay_4_light_mode};
 
                 for (uint8_t i = 0; i < ${gang_count}; i++) {
-                  // When the associated button action is a virtual relay and the
-                  // API is connected, the indicator LEDs follow the virtual state
-                  // instead of the physical relay.
-                  const auto action = static_cast<ButtonAction>(button_actions[i]->active_index().value_or(1));
-                  const bool relay_state = (action == ButtonAction::VirtualRelay and api_connected)
-                                               ? id(virtual_relay_states)[i]
-                                               : id(relay_states)[i];
+                  const auto mode = static_cast<GangMode>(gang_modes[i]->active_index().value_or(1));
+
+                  bool relay_state = false;
+                  switch (mode) {
+                    case GangMode::Relay:
+                    case GangMode::DetachedRelay:
+                      relay_state = id(relay_states)[i];
+                      break;
+                    case GangMode::VirtualRelay:
+                      relay_state = api_connected ? id(virtual_relay_states)[i] : id(relay_states)[i];
+                      break;
+                    case GangMode::DetachedVirtualRelay:
+                      relay_state = id(virtual_relay_states)[i];
+                      break;
+                    case GangMode::Disabled:
+                    default:
+                      relay_state = false;
+                      break;
+                  }
+
                   const auto light_mode = static_cast<RelayLightMode>(light_modes[i]->active_index().value_or(1));
                   const std::string light_mode_str = light_modes[i]->current_option();
 
-                  ESP_LOGV("${TAG_HW_RELAYS}", "Relay %" PRIu8 " is %s", i + 1, relay_state ? "ON" : "OFF");
-                  ESP_LOGV("${TAG_HW_RELAYS}", "Light Mode for Relay %" PRIu8 ": %s", i + 1, light_mode_str.c_str());
+                  ESP_LOGV("${TAG_HW_RELAYS}", "Gang %" PRIu8 " is %s (mode: %s)",
+                           i + 1, relay_state ? "ON" : "OFF", gang_modes[i]->current_option().c_str());
+                  ESP_LOGV("${TAG_HW_RELAYS}", "Light Mode for Gang %" PRIu8 ": %s", i + 1, light_mode_str.c_str());
 
                   const bool group_1_on =
                       relay_state &&

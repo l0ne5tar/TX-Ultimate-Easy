@@ -81,6 +81,28 @@ script:
           }
 
 select:
+  - id: sl_gang_${gang}_mode
+    name: Gang ${gang} mode
+    platform: template
+    options:
+      - "Disabled"
+      - "Relay"
+      - "Virtual Relay"
+      - "Detached Relay"
+      - "Detached Virtual Relay"
+    initial_option: >-
+      ${ "Disabled" if [RELAY_1_MODE_LOWER, RELAY_2_MODE_LOWER, RELAY_3_MODE_LOWER, RELAY_4_MODE_LOWER][idx] == "disabled"
+         else "Relay" }
+    optimistic: true
+    disabled_by_default: false
+    entity_category: config
+    icon: mdi:tune
+    restore_value: ${gang_count >= gang}
+    internal: ${gang_count < gang}
+    on_value:
+      then:
+        - script.execute: show_relay_status
+
   - id: sl_relay_${gang}_light_mode
     name: Relay ${gang} light mode
     platform: template

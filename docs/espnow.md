@@ -1,10 +1,10 @@
 # ESP-NOW
 
-Switches can control relays on other TX Ultimate Easy devices directly (peer-to-peer), without Home Assistant.
+Switches can control relays on other TX Ultimate Easy devices directly (peer-to-peer) with ~4ms latency, completely independent of Home Assistant or Wi-Fi connectivity.
 
-**Setup:**
+## Setup
 
-1. Add the package to your device YAML:
+1. Add the ESP-NOW package to your device YAML:
 
    ```yaml
    packages:
@@ -18,20 +18,43 @@ Switches can control relays on other TX Ultimate Easy devices directly (peer-to-
          - ESPHome/TX-Ultimate-Easy-ESPHome_espnow.yaml
    ```
 
-2. Get each switch’s MAC from the **"ESP-NOW MAC Address"** text sensor in Home Assistant.
+2. Flash once. All ESP-NOW configuration is **runtime configurable per gang** directly from Home Assistant — no recompilation or reflashing needed when pairing or moving switches!
 
-3. In your device YAML, set per-button target MAC and relay (1–4). For buttons you don’t want on ESP-NOW, don’t set anything (they use local relay only).
+## Configuration
 
-   ```yaml
-   substitutions:
-     espnow_target_mac_button_1: "AA:BB:CC:DD:EE:FF"
-     espnow_target_relay_button_1: 1
-     # Only set espnow_target_mac_button_2..4 and espnow_target_relay_button_2..4 if you want those buttons to control a remote relay
-   ```
+Each gang exposes three configuration entities to Home Assistant:
 
-4. Recompile and flash. In Home Assistant, set **"ESP-NOW Send"** on the devices that should send, and turn on **"ESP-NOW Receive Enabled"** on the devices that should receive.
-   - **Off**: never send (default).
-   - **Always**: send whenever a configured button is clicked.
-   - **API failsafe only**: send only while the device is not connected to Home Assistant (API or Wi-Fi disconnected), matching the "API failsafe only" button action.
+- **`Gang N ESP-NOW Target MAC`** (Text): The MAC address of the destination device (e.g. `AA:BB:CC:DD:EE:FF`). You can find any device's MAC from its **"ESP-NOW MAC Address"** sensor or Home Assistant device info.
+- **`Gang N ESP-NOW Target Gang`** (Select): Which gang on the destination device to toggle (`Gang 1` .. `Gang 4`).
+- **`Gang N ESP-NOW Mode`** (Select):
+  - **`Off`**: Disabled (default).
+  - **`Always`**: Sends an ESP-NOW toggle packet on every touch for ultra-fast 4ms hardware control.
+  - **`API failsafe only`**: Sends via ESP-NOW only when disconnected from Home Assistant or Wi-Fi, providing seamless offline failsafe operation.
 
-Works without Home Assistant. Config is in YAML only; changes need recompile and flash.
+On the destination device with physical loads, turn on **`ESP-NOW Receive Enabled`**.
+
+### Optional YAML Seeding
+
+If you prefer to pre-seed default targets in your YAML at compile time, you can still provide substitutions:
+
+```yaml
+substitutions:
+  espnow_target_mac_button_1: "AA:BB:CC:DD:EE:FF"
+  espnow_target_relay_button_1: 1
+```
+
+These values serve as the initial restore seed; changing them in Home Assistant at runtime takes precedence.
+
+## Automatic "Fire-and-Forget" Binding via Home Assistant Blueprint
+
+When using the **TX Ultimate Easy - Gang Link** blueprint (`gang_link.yaml`):
+
+1. Set `physical_entity` to the main relay driving the load.
+2. Select your linked remote panels in `virtual_entities`.
+3. Enable **`Automatic ESP-NOW Peer-to-Peer Binding`**.
+
+Home Assistant will automatically resolve the destination MAC address, target gang, and program all runtime entities and receiver states across all panels. Once saved, peer-to-peer control is active and continues working even if Home Assistant is stopped or the router is unplugged.
+
+## 2-Way State Synchronization
+
+When an ESP-NOW toggle is received, the target device toggles its gang according to its own configured gang mode (`Relay`, `Virtual Relay`, etc.) and immediately sends back a hardware-acknowledged state broadcast (`0x02`). The sender panel updates its virtual relay state and LED ring indicators within 4ms.

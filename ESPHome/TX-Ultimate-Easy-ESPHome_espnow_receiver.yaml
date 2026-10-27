@@ -11,9 +11,6 @@
 ####################################################################################################
 ---
 substitutions:
-  # ============================================================================
-  # INTERNAL VALIDATION (Do not modify)
-  # ============================================================================
   TAG_ESPNOW_RECEIVER: tx_ultimate_easy.espnow.receiver
 
 esphome:
@@ -22,75 +19,73 @@ esphome:
 
 espnow:
   id: espnow_component
+  auto_add_peer: true
   on_receive:
     lambda: |-
-      // Check if ESP-NOW receiving is enabled
       if (!sw_espnow_receive_enabled->state) {
         ESP_LOGD("${TAG_ESPNOW_RECEIVER}", "ESP-NOW receiving disabled, ignoring message");
         return;
       }
-
-      // Validate message data pointer
-      if (data == nullptr) {
-        ESP_LOGW("${TAG_ESPNOW_RECEIVER}", "Received ESP-NOW message with null data pointer");
+      if (data == nullptr || size < 2) {
         return;
       }
 
-      // Validate message size (ESP-NOW Protocol: 2 bytes)
-      // Byte 0: Command (0x01 = Toggle Relay)
-      // Byte 1: Relay Number (1-${gang_count})
-      if (size != 2) {
-        ESP_LOGW("${TAG_ESPNOW_RECEIVER}", "Invalid message size: %zu (expected 2)", size);
-        return;
-      }
-
-      // Parse message
       const uint8_t command = data[0];
-      const uint8_t relay_num = data[1];
+      const uint8_t gang_num = data[1];
 
-      ESP_LOGI("${TAG_ESPNOW_RECEIVER}", "ESP-NOW message received: command=0x%02X, relay=%" PRIu8, command, relay_num);
-
-      // Validate command
       if (command != 0x01) {
-        ESP_LOGW("${TAG_ESPNOW_RECEIVER}", "Unknown command: 0x%02X", command);
+        return;  // Only handle toggle commands (0x01)
+      }
+
+      if (gang_num < 1 || gang_num > ${gang_count}) {
+        ESP_LOGW("${TAG_ESPNOW_RECEIVER}", "Invalid gang number: %" PRIu8 " (valid range: 1-${gang_count})", gang_num);
         return;
       }
 
-      if (relay_num < 1 || relay_num > ${gang_count}) {
-        ESP_LOGW("${TAG_ESPNOW_RECEIVER}", "Invalid relay number: %" PRIu8 " (valid range: 1-${gang_count})", relay_num);
-        return;
-      }
+      ESP_LOGI("${TAG_ESPNOW_RECEIVER}", "ESP-NOW toggle received for gang %" PRIu8, gang_num);
+      toggle_gang->execute(gang_num);
 
-      // Toggle the requested relay
-      #if ${gang_count} >= 1
-      ESP_LOGI("${TAG_ESPNOW_RECEIVER}", "Toggling relay %" PRIu8, relay_num);
-      switch (relay_num) {
-        #if ${gang_count} >= 1 && ${SL_RELAY_1_MODE} > 0
-        case 1: id(sw_relay_1)->toggle(); break;
-        #endif  // gang_count >= 1 && SL_RELAY_1_MODE > 0
-        #if ${gang_count} >= 2 && ${SL_RELAY_2_MODE} > 0
-        case 2: id(sw_relay_2)->toggle(); break;
-        #endif  // gang_count >= 2 && SL_RELAY_2_MODE > 0
-        #if ${gang_count} >= 3 && ${SL_RELAY_3_MODE} > 0
-        case 3: id(sw_relay_3)->toggle(); break;
-        #endif  // gang_count >= 3 && SL_RELAY_3_MODE > 0
-        #if ${gang_count} >= 4 && ${SL_RELAY_4_MODE} > 0
-        case 4: id(sw_relay_4)->toggle(); break;
-        #endif  // gang_count >= 4 && SL_RELAY_4_MODE > 0
-      }
-      #endif  // gang_count >= 1
+      // Determine state after toggle to reply to sender
+      const uint8_t idx = gang_num - 1;
+      using esphome::tx_ultimate_easy::GangMode;
+      esphome::select::Select *const gang_modes[4] = {
+          sl_gang_1_mode, sl_gang_2_mode, sl_gang_3_mode, sl_gang_4_mode};
+      const auto mode = static_cast<GangMode>(gang_modes[idx]->active_index().value_or(1));
+      const bool current_state = (mode == GangMode::VirtualRelay) ?
+          id(virtual_relay_states)[idx] : id(relay_states)[idx];
+
+      espnow_send_state_reply->execute(info.src_addr[0], info.src_addr[1], info.src_addr[2],
+                                       info.src_addr[3], info.src_addr[4], info.src_addr[5],
+                                       gang_num, static_cast<uint8_t>(current_state ? 1 : 0));
 
 script:
+  - id: espnow_send_state_reply
+    mode: parallel
+    parameters:
+      m0: uint8_t
+      m1: uint8_t
+      m2: uint8_t
+      m3: uint8_t
+      m4: uint8_t
+      m5: uint8_t
+      gang: uint8_t
+      state: uint8_t
+    then:
+      - espnow.send:
+          id: espnow_component
+          address: !lambda |-
+            return {m0, m1, m2, m3, m4, m5};
+          data: !lambda |-
+            return {0x02, gang, state};
+          wait_for_sent: false
+
   - id: !extend dump_config_list_packages
     then:
       - script.wait: dump_config
       - lambda: |-
-          // Check for requirements
           #ifndef TX_ULTIMATE_EASY_HW_RELAYS
             #error "The package TX-Ultimate-Easy-ESPHome_hw_relays.yaml is required."
-          #endif  // TX_ULTIMATE_EASY_HW_RELAYS
-
-          // Identify itself
+          #endif
           ESP_LOGCONFIG(ESPHOME_PROJECT_NAME, "  - ESP-NOW Receiver");
 
 switch:

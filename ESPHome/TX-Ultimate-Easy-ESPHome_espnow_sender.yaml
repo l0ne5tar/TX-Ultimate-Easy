@@ -12,192 +12,120 @@
 ---
 substitutions:
   # ============================================================================
-  # USER CONFIGURATION (User should modify these on their local YAML file)
+  # DEFAULT CONFIGURATION (Runtime entities are seeded with these initial values)
   # ============================================================================
-
-  # ESP-NOW button 1 configuration
   espnow_target_mac_button_1: "00:00:00:00:00:00"
   espnow_target_relay_button_1: 1
 
-  # ESP-NOW button 2 configuration
   espnow_target_mac_button_2: "00:00:00:00:00:00"
   espnow_target_relay_button_2: 2
 
-  # ESP-NOW button 3 configuration
   espnow_target_mac_button_3: "00:00:00:00:00:00"
   espnow_target_relay_button_3: 3
 
-  # ESP-NOW button 4 configuration
   espnow_target_mac_button_4: "00:00:00:00:00:00"
   espnow_target_relay_button_4: 4
 
-  espnow_send_delay: 100ms
+  espnow_send_delay: 0ms
 
   # ============================================================================
-  # INTERNAL VALIDATION (Do not modify)
+  # INTERNAL CONSTANTS
   # ============================================================================
   TAG_ESPNOW_SENDER: tx_ultimate_easy.espnow.sender
 
-  # Send mode options (order matters: the index is used by espnow_send)
-  ESPNOW_SEND_MODE_OFF_TEXT: "Off"                         # Index 0
-  ESPNOW_SEND_MODE_ALWAYS_TEXT: "Always"                   # Index 1
-  ESPNOW_SEND_MODE_FAILSAFE_TEXT: "API failsafe only"      # Index 2
-
-  # Validate MAC format (length and colon positions)
-  ESPNOW_BUTTON_1_MAC_VALID: >-
-    ${ '1' if (
-        espnow_target_mac_button_1|length == 17
-        and espnow_target_mac_button_1[2] == ':'
-        and espnow_target_mac_button_1[5] == ':'
-        and espnow_target_mac_button_1[8] == ':'
-        and espnow_target_mac_button_1[11] == ':'
-        and espnow_target_mac_button_1[14] == ':'
-    ) else '0' }
-
-  ESPNOW_BUTTON_2_MAC_VALID: >-
-    ${ '1' if (
-        espnow_target_mac_button_2|length == 17
-        and espnow_target_mac_button_2[2] == ':'
-        and espnow_target_mac_button_2[5] == ':'
-        and espnow_target_mac_button_2[8] == ':'
-        and espnow_target_mac_button_2[11] == ':'
-        and espnow_target_mac_button_2[14] == ':'
-    ) else '0' }
-
-  ESPNOW_BUTTON_3_MAC_VALID: >-
-    ${ '1' if (
-        espnow_target_mac_button_3|length == 17
-        and espnow_target_mac_button_3[2] == ':'
-        and espnow_target_mac_button_3[5] == ':'
-        and espnow_target_mac_button_3[8] == ':'
-        and espnow_target_mac_button_3[11] == ':'
-        and espnow_target_mac_button_3[14] == ':'
-    ) else '0' }
-
-  ESPNOW_BUTTON_4_MAC_VALID: >-
-    ${ '1' if (
-        espnow_target_mac_button_4|length == 17
-        and espnow_target_mac_button_4[2] == ':'
-        and espnow_target_mac_button_4[5] == ':'
-        and espnow_target_mac_button_4[8] == ':'
-        and espnow_target_mac_button_4[11] == ':'
-        and espnow_target_mac_button_4[14] == ':'
-    ) else '0' }
+  ESPNOW_SEND_MODE_OFF_TEXT: "Off"
+  ESPNOW_SEND_MODE_ALWAYS_TEXT: "Always"
+  ESPNOW_SEND_MODE_FAILSAFE_TEXT: "API failsafe only"
 
 esphome:
   build_flags:
     - -D TX_ULTIMATE_EASY_ESPNOW_SENDER
-    - -D TX_ULTIMATE_EASY_ESPNOW_BUTTON_1_MAC_DEFINED=${ 0 if espnow_target_mac_button_1 == '00:00:00:00:00:00' else 1 }
-    - -D TX_ULTIMATE_EASY_ESPNOW_BUTTON_2_MAC_DEFINED=${ 0 if espnow_target_mac_button_2 == '00:00:00:00:00:00' else 1 }
-    - -D TX_ULTIMATE_EASY_ESPNOW_BUTTON_3_MAC_DEFINED=${ 0 if espnow_target_mac_button_3 == '00:00:00:00:00:00' else 1 }
-    - -D TX_ULTIMATE_EASY_ESPNOW_BUTTON_4_MAC_DEFINED=${ 0 if espnow_target_mac_button_4 == '00:00:00:00:00:00' else 1 }
-    - -D TX_ULTIMATE_EASY_ESPNOW_BUTTON_1_MAC_INVALID=${ 0 if ESPNOW_BUTTON_1_MAC_VALID == '1' else 1 }
-    - -D TX_ULTIMATE_EASY_ESPNOW_BUTTON_2_MAC_INVALID=${ 0 if ESPNOW_BUTTON_2_MAC_VALID == '1' else 1 }
-    - -D TX_ULTIMATE_EASY_ESPNOW_BUTTON_3_MAC_INVALID=${ 0 if ESPNOW_BUTTON_3_MAC_VALID == '1' else 1 }
-    - -D TX_ULTIMATE_EASY_ESPNOW_BUTTON_4_MAC_INVALID=${ 0 if ESPNOW_BUTTON_4_MAC_VALID == '1' else 1 }
+
+packages:
+  espnow_sender_gang_1: !include
+    file: TX-Ultimate-Easy-ESPHome_espnow_sender_gang.yaml
+    vars:
+      gang: 1
+      idx: 0
+  espnow_sender_gang_2: !include
+    file: TX-Ultimate-Easy-ESPHome_espnow_sender_gang.yaml
+    vars:
+      gang: 2
+      idx: 1
+  espnow_sender_gang_3: !include
+    file: TX-Ultimate-Easy-ESPHome_espnow_sender_gang.yaml
+    vars:
+      gang: 3
+      idx: 2
+  espnow_sender_gang_4: !include
+    file: TX-Ultimate-Easy-ESPHome_espnow_sender_gang.yaml
+    vars:
+      gang: 4
+      idx: 3
 
 espnow:
   id: espnow_component
   auto_add_peer: true
+  on_receive:
+    lambda: |-
+      if (data == nullptr || size < 3) return;
+      if (data[0] != 0x02) return;  // State report command (0x02, remote_gang, state)
 
-globals:  # ESP-NOW configuration lookup tables
-  - id: espnow_button_enabled  # Validated enabled status (populated at boot)
-    type: std::vector<bool>
-    restore_value: false
-    initial_value: '{false, false, false, false}'
+      const uint8_t remote_gang = data[1];
+      const bool remote_state = (data[2] != 0);
 
-  - id: espnow_mac_addresses
-    type: std::vector<std::string>
-    restore_value: false
-    initial_value: |-
-      {
-        "${espnow_target_mac_button_1}",
-        "${espnow_target_mac_button_2}",
-        "${espnow_target_mac_button_3}",
-        "${espnow_target_mac_button_4}"
-      }
+      using esphome::tx_ultimate_easy::parse_mac_address;
+      esphome::text::Text *const mac_texts[4] = {
+        txt_gang_1_espnow_target_mac, txt_gang_2_espnow_target_mac,
+        txt_gang_3_espnow_target_mac, txt_gang_4_espnow_target_mac
+      };
+      esphome::select::Select *const target_gang_selects[4] = {
+        sl_gang_1_espnow_target_gang, sl_gang_2_espnow_target_gang,
+        sl_gang_3_espnow_target_gang, sl_gang_4_espnow_target_gang
+      };
+      esphome::select::Select *const mode_selects[4] = {
+        sl_gang_1_espnow_mode, sl_gang_2_espnow_mode,
+        sl_gang_3_espnow_mode, sl_gang_4_espnow_mode
+      };
+      esphome::switch_::Switch *const virtual_switches[4] = {
+        sw_virtual_relay_1, sw_virtual_relay_2, sw_virtual_relay_3, sw_virtual_relay_4
+      };
+      esphome::light::LightState *const virtual_lights[4] = {
+        light_virtual_relay_1, light_virtual_relay_2, light_virtual_relay_3, light_virtual_relay_4
+      };
 
-  - id: espnow_mac_bytes  # Parsed MAC addresses as bytes (populated at boot, ready for ESP-NOW)
-    type: std::vector<std::array<uint8_t, 6>>
-    restore_value: false
-    initial_value: |-
-      {
-        {0, 0, 0, 0, 0, 0},
-        {0, 0, 0, 0, 0, 0},
-        {0, 0, 0, 0, 0, 0},
-        {0, 0, 0, 0, 0, 0}
-      }
+      for (uint8_t i = 0; i < ${gang_count}; i++) {
+        if (mode_selects[i]->active_index().value_or(0) == 0) continue;
 
-  - id: espnow_relay_numbers
-    type: std::vector<uint8_t>
-    restore_value: false
-    initial_value: |-
-      {
-        ${espnow_target_relay_button_1},
-        ${espnow_target_relay_button_2},
-        ${espnow_target_relay_button_3},
-        ${espnow_target_relay_button_4}
+        uint8_t target_mac[6];
+        if (!parse_mac_address(mac_texts[i]->state, target_mac)) continue;
+
+        if (memcmp(target_mac, info.src_addr, 6) != 0) continue;
+
+        const uint8_t expected_remote_gang = static_cast<uint8_t>(
+            target_gang_selects[i]->active_index().value_or(i) + 1);
+        if (expected_remote_gang != remote_gang) continue;
+
+        ESP_LOGI("${TAG_ESPNOW_SENDER}",
+                 "ESP-NOW state sync: remote gang %" PRIu8 " -> local gang %" PRIu8 " = %s",
+                 remote_gang, i + 1, remote_state ? "ON" : "OFF");
+
+        id(virtual_relay_states)[i] = remote_state;
+        show_relay_status->execute();
+
+        if (virtual_switches[i]->state != remote_state) {
+          virtual_switches[i]->publish_state(remote_state);
+        }
+        if (virtual_lights[i]->current_values.is_on() != remote_state) {
+          virtual_lights[i]->current_values.set_state(remote_state);
+          virtual_lights[i]->publish_state();
+        }
       }
 
 script:
-  - id: !extend boot_initialize
-    then:
-      - script.execute: boot_initialize_espnow
-
-  - id: boot_initialize_espnow
-    mode: restart
-    then:
-      - lambda: |-
-          // Validate MAC addresses and populate espnow_button_enabled global
-          // Also parse and store MAC bytes for efficient sending
-          // Compile-time validation already confirmed:
-          //   - MAC format (length, colon positions)
-          //   - Relay numbers (1-4)
-          //   - Gang count compatibility
-          // Runtime validation only checks hex characters in MAC address
-
-          // Helper function to parse MAC string to bytes
-          auto parse_mac_bytes = [](const std::string& mac_str, uint8_t* mac_bytes) -> bool {
-            std::string mac_upper = mac_str;
-            std::transform(mac_upper.begin(), mac_upper.end(), mac_upper.begin(), ::toupper);
-
-            int values[6];
-            if (sscanf(mac_upper.c_str(), "%02X:%02X:%02X:%02X:%02X:%02X",
-                      &values[0], &values[1], &values[2],
-                      &values[3], &values[4], &values[5]) != 6) {
-              return false;
-            }
-
-            for (int i = 0; i < 6; i++) {
-              mac_bytes[i] = static_cast<uint8_t>(values[i]);
-            }
-            return true;
-          };
-
-          // Button 1 - Parse and enable if valid
-          #if TX_ULTIMATE_EASY_ESPNOW_BUTTON_1_MAC_DEFINED
-          id(espnow_button_enabled)[0] = parse_mac_bytes(id(espnow_mac_addresses)[0], id(espnow_mac_bytes)[0].data());
-          #endif  // TX_ULTIMATE_EASY_ESPNOW_BUTTON_1_MAC_DEFINED
-
-          // Button 2 - Parse and enable if valid
-          #if TX_ULTIMATE_EASY_ESPNOW_BUTTON_2_MAC_DEFINED && ${gang_count} >= 2
-          id(espnow_button_enabled)[1] = parse_mac_bytes(id(espnow_mac_addresses)[1], id(espnow_mac_bytes)[1].data());
-          #endif  // TX_ULTIMATE_EASY_ESPNOW_BUTTON_2_MAC_DEFINED && gang_count
-
-          // Button 3 - Parse and enable if valid
-          #if TX_ULTIMATE_EASY_ESPNOW_BUTTON_3_MAC_DEFINED && ${gang_count} >= 3
-          id(espnow_button_enabled)[2] = parse_mac_bytes(id(espnow_mac_addresses)[2], id(espnow_mac_bytes)[2].data());
-          #endif  // TX_ULTIMATE_EASY_ESPNOW_BUTTON_3_MAC_DEFINED && gang_count
-
-          // Button 4 - Parse and enable if valid
-          #if TX_ULTIMATE_EASY_ESPNOW_BUTTON_4_MAC_DEFINED && ${gang_count} >= 4
-          id(espnow_button_enabled)[3] = parse_mac_bytes(id(espnow_mac_addresses)[3], id(espnow_mac_bytes)[3].data());
-          #endif  // TX_ULTIMATE_EASY_ESPNOW_BUTTON_4_MAC_DEFINED && gang_count
-
   - id: !extend button_click_event
     then:
       - lambda: |-
-          // Send mode is evaluated by espnow_send
           if (click_count != 1) {
             return;
           }
@@ -206,120 +134,34 @@ script:
   - id: !extend dump_config
     then:
       - lambda: |-
-          // Validate ESP-NOW button 1 configuration
-          #if TX_ULTIMATE_EASY_ESPNOW_BUTTON_1_MAC_DEFINED
-            // MAC is set (not null), validate format
-            #if TX_ULTIMATE_EASY_ESPNOW_BUTTON_1_MAC_INVALID
-              #error "espnow_target_mac_button_1 has invalid MAC format (must be XX:XX:XX:XX:XX:XX)"
-            #endif  // TX_ULTIMATE_EASY_ESPNOW_BUTTON_1_MAC_INVALID
-
-            // Validate target relay
-            #if ${espnow_target_relay_button_1} < 1 || ${espnow_target_relay_button_1} > 4
-              #error "espnow_target_relay_button_1 must be between 1 and 4"
-            #endif  // espnow_target_relay_button_1 range
-          #endif  // TX_ULTIMATE_EASY_ESPNOW_BUTTON_1_MAC_DEFINED
-
-          // Validate ESP-NOW button 2 configuration
-          #if TX_ULTIMATE_EASY_ESPNOW_BUTTON_2_MAC_DEFINED
-            // MAC is set (not null), validate format
-            #if TX_ULTIMATE_EASY_ESPNOW_BUTTON_2_MAC_INVALID
-              #error "espnow_target_mac_button_2 has invalid MAC format (must be XX:XX:XX:XX:XX:XX)"
-            #endif  // TX_ULTIMATE_EASY_ESPNOW_BUTTON_2_MAC_INVALID
-
-            // Validate target relay
-            #if ${espnow_target_relay_button_2} < 1 || ${espnow_target_relay_button_2} > 4
-              #error "espnow_target_relay_button_2 must be between 1 and 4"
-            #endif  // espnow_target_relay_button_2 range
-          #endif  // TX_ULTIMATE_EASY_ESPNOW_BUTTON_2_MAC_DEFINED
-
-          // Validate ESP-NOW button 3 configuration
-          #if TX_ULTIMATE_EASY_ESPNOW_BUTTON_3_MAC_DEFINED
-            // MAC is set (not null), validate format
-            #if TX_ULTIMATE_EASY_ESPNOW_BUTTON_3_MAC_INVALID
-              #error "espnow_target_mac_button_3 has invalid MAC format (must be XX:XX:XX:XX:XX:XX)"
-            #endif  // TX_ULTIMATE_EASY_ESPNOW_BUTTON_3_MAC_INVALID
-
-            // Validate target relay
-            #if ${espnow_target_relay_button_3} < 1 || ${espnow_target_relay_button_3} > 4
-              #error "espnow_target_relay_button_3 must be between 1 and 4"
-            #endif  // espnow_target_relay_button_3 range
-          #endif  // TX_ULTIMATE_EASY_ESPNOW_BUTTON_3_MAC_DEFINED
-
-          // Validate ESP-NOW button 4 configuration
-          #if TX_ULTIMATE_EASY_ESPNOW_BUTTON_4_MAC_DEFINED
-            // MAC is set (not null), validate format
-            #if TX_ULTIMATE_EASY_ESPNOW_BUTTON_4_MAC_INVALID
-              #error "espnow_target_mac_button_4 has invalid MAC format (must be XX:XX:XX:XX:XX:XX)"
-            #endif  // TX_ULTIMATE_EASY_ESPNOW_BUTTON_4_MAC_INVALID
-
-            // Validate target relay
-            #if ${espnow_target_relay_button_4} < 1 || ${espnow_target_relay_button_4} > 4
-              #error "espnow_target_relay_button_4 must be between 1 and 4"
-            #endif  // espnow_target_relay_button_4 range
-          #endif  // TX_ULTIMATE_EASY_ESPNOW_BUTTON_4_MAC_DEFINED
-
-          ESP_LOGCONFIG("${TAG_ESPNOW_SENDER}", "ESP-NOW settings:");
-
-          // Button 1 configuration
-          #if TX_ULTIMATE_EASY_ESPNOW_BUTTON_1_MAC_DEFINED
-            ESP_LOGCONFIG("${TAG_ESPNOW_SENDER}", "  Button 1:");
-            ESP_LOGCONFIG("${TAG_ESPNOW_SENDER}", "    Enabled: %s", YESNO(id(espnow_button_enabled)[0]));
-            ESP_LOGCONFIG("${TAG_ESPNOW_SENDER}", "    MAC: ${espnow_target_mac_button_1}");
-            ESP_LOGCONFIG("${TAG_ESPNOW_SENDER}", "    Target Relay: %" PRIu8,
-                          static_cast<uint8_t>(${espnow_target_relay_button_1}));
-          #else
-            ESP_LOGCONFIG("${TAG_ESPNOW_SENDER}", "  Button 1: Disabled (null MAC)");
-          #endif  // TX_ULTIMATE_EASY_ESPNOW_BUTTON_1_MAC_DEFINED
-
-          // Button 2 configuration
-          #if ${gang_count} >= 2
-            #if TX_ULTIMATE_EASY_ESPNOW_BUTTON_2_MAC_DEFINED
-              ESP_LOGCONFIG("${TAG_ESPNOW_SENDER}", "  Button 2:");
-              ESP_LOGCONFIG("${TAG_ESPNOW_SENDER}", "    Enabled: %s", YESNO(id(espnow_button_enabled)[1]));
-              ESP_LOGCONFIG("${TAG_ESPNOW_SENDER}", "    MAC: ${espnow_target_mac_button_2}");
-              ESP_LOGCONFIG("${TAG_ESPNOW_SENDER}", "    Target Relay: %" PRIu8,
-                              static_cast<uint8_t>(${espnow_target_relay_button_2}));
-            #else
-              ESP_LOGCONFIG("${TAG_ESPNOW_SENDER}", "  Button 2: Disabled (null MAC)");
-            #endif  // TX_ULTIMATE_EASY_ESPNOW_BUTTON_2_MAC_DEFINED
-          #endif  // ${gang_count} >= 2
-
-          // Button 3 configuration
-          #if ${gang_count} >= 3
-            #if TX_ULTIMATE_EASY_ESPNOW_BUTTON_3_MAC_DEFINED
-              ESP_LOGCONFIG("${TAG_ESPNOW_SENDER}", "  Button 3:");
-              ESP_LOGCONFIG("${TAG_ESPNOW_SENDER}", "    Enabled: %s", YESNO(id(espnow_button_enabled)[2]));
-              ESP_LOGCONFIG("${TAG_ESPNOW_SENDER}", "    MAC: ${espnow_target_mac_button_3}");
-              ESP_LOGCONFIG("${TAG_ESPNOW_SENDER}", "    Target Relay: %" PRIu8,
-                              static_cast<uint8_t>(${espnow_target_relay_button_3}));
-            #else
-              ESP_LOGCONFIG("${TAG_ESPNOW_SENDER}", "  Button 3: Disabled (null MAC)");
-            #endif  // TX_ULTIMATE_EASY_ESPNOW_BUTTON_3_MAC_DEFINED
-          #endif  // ${gang_count} >= 3
-
-          // Button 4 configuration
-          #if ${gang_count} >= 4
-            #if TX_ULTIMATE_EASY_ESPNOW_BUTTON_4_MAC_DEFINED
-              ESP_LOGCONFIG("${TAG_ESPNOW_SENDER}", "  Button 4:");
-              ESP_LOGCONFIG("${TAG_ESPNOW_SENDER}", "    Enabled: %s", YESNO(id(espnow_button_enabled)[3]));
-              ESP_LOGCONFIG("${TAG_ESPNOW_SENDER}", "    MAC: ${espnow_target_mac_button_4}");
-              ESP_LOGCONFIG("${TAG_ESPNOW_SENDER}", "    Target Relay: %" PRIu8,
-                              static_cast<uint8_t>(${espnow_target_relay_button_4}));
-            #else
-              ESP_LOGCONFIG("${TAG_ESPNOW_SENDER}", "  Button 4: Disabled (null MAC)");
-            #endif  // TX_ULTIMATE_EASY_ESPNOW_BUTTON_4_MAC_DEFINED
-          #endif  // ${gang_count} >= 4
+          ESP_LOGCONFIG("${TAG_ESPNOW_SENDER}", "ESP-NOW Sender settings:");
+          esphome::text::Text *const mac_texts[4] = {
+            txt_gang_1_espnow_target_mac, txt_gang_2_espnow_target_mac,
+            txt_gang_3_espnow_target_mac, txt_gang_4_espnow_target_mac
+          };
+          esphome::select::Select *const target_gang_selects[4] = {
+            sl_gang_1_espnow_target_gang, sl_gang_2_espnow_target_gang,
+            sl_gang_3_espnow_target_gang, sl_gang_4_espnow_target_gang
+          };
+          esphome::select::Select *const mode_selects[4] = {
+            sl_gang_1_espnow_mode, sl_gang_2_espnow_mode,
+            sl_gang_3_espnow_mode, sl_gang_4_espnow_mode
+          };
+          for (uint8_t i = 0; i < ${gang_count}; i++) {
+            ESP_LOGCONFIG("${TAG_ESPNOW_SENDER}", "  Gang %" PRIu8 ": Mode=%s, Target MAC=%s, Target Gang=%s",
+                          i + 1,
+                          mode_selects[i]->current_option().c_str(),
+                          mac_texts[i]->state.c_str(),
+                          target_gang_selects[i]->current_option().c_str());
+          }
 
   - id: !extend dump_config_list_packages
     then:
       - script.wait: dump_config
       - lambda: |-
-          // Check for requirements
           #ifndef TX_ULTIMATE_EASY_HW_BUTTONS
             #error "The package TX-Ultimate-Easy-ESPHome_hw_buttons.yaml is required."
-          #endif  // TX_ULTIMATE_EASY_HW_BUTTONS
-
-          // Identify itself
+          #endif
           ESP_LOGCONFIG(ESPHOME_PROJECT_NAME, "  - ESP-NOW Sender");
 
   - id: espnow_send
@@ -331,62 +173,80 @@ script:
       - if:
           condition:
             - lambda: |-
-                // Early exit based on send mode (see ESPNOW_SEND_MODE_*_TEXT for the index mapping)
-                switch (sl_espnow_send_mode->active_index().value_or(0)) {
+                if (button < 1 || button > ${gang_count}) return false;
+                esphome::select::Select *const mode_selects[4] = {
+                  sl_gang_1_espnow_mode, sl_gang_2_espnow_mode,
+                  sl_gang_3_espnow_mode, sl_gang_4_espnow_mode
+                };
+                const uint8_t idx = button - 1;
+                switch (mode_selects[idx]->active_index().value_or(0)) {
                   case 1:  // Always
-                    return true;
+                    break;
                   case 2:  // API failsafe only
-                    return !global_api_server->is_connected_with_state_subscription() || !wifi_component->is_connected();
+                    if (global_api_server->is_connected_with_state_subscription() && wifi_component->is_connected()) {
+                      return false;
+                    }
+                    break;
                   default:  // Off
                     return false;
                 }
-            - lambda: return button > 0 && button <= ${gang_count};  // Validate button range
-            - lambda: return id(espnow_button_enabled)[button - 1];  // Check if button is enabled (validated at boot)
+
+                using esphome::tx_ultimate_easy::parse_mac_address;
+                esphome::text::Text *const mac_texts[4] = {
+                  txt_gang_1_espnow_target_mac, txt_gang_2_espnow_target_mac,
+                  txt_gang_3_espnow_target_mac, txt_gang_4_espnow_target_mac
+                };
+                uint8_t mac[6];
+                return parse_mac_address(mac_texts[idx]->state, mac);
           then:
             - delay: ${espnow_send_delay}
             - espnow.send:
                 id: espnow_component
                 address: !lambda |-
+                  using esphome::tx_ultimate_easy::parse_mac_address;
                   const uint8_t idx = button - 1;
-                  const auto& mac = id(espnow_mac_bytes)[idx];
+                  esphome::text::Text *const mac_texts[4] = {
+                    txt_gang_1_espnow_target_mac, txt_gang_2_espnow_target_mac,
+                    txt_gang_3_espnow_target_mac, txt_gang_4_espnow_target_mac
+                  };
+                  uint8_t mac[6] = {0};
+                  parse_mac_address(mac_texts[idx]->state, mac);
                   return {mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]};
                 data: !lambda |-
                   const uint8_t idx = button - 1;
-                  return {0x01, id(espnow_relay_numbers)[idx]};
+                  esphome::select::Select *const target_gang_selects[4] = {
+                    sl_gang_1_espnow_target_gang, sl_gang_2_espnow_target_gang,
+                    sl_gang_3_espnow_target_gang, sl_gang_4_espnow_target_gang
+                  };
+                  const uint8_t target_gang = static_cast<uint8_t>(
+                      target_gang_selects[idx]->active_index().value_or(idx) + 1);
+                  return {0x01, target_gang};
                 wait_for_sent: false
                 on_sent:
                   - lambda: |-
                       const uint8_t idx = button - 1;
+                      esphome::text::Text *const mac_texts[4] = {
+                        txt_gang_1_espnow_target_mac, txt_gang_2_espnow_target_mac,
+                        txt_gang_3_espnow_target_mac, txt_gang_4_espnow_target_mac
+                      };
+                      esphome::select::Select *const target_gang_selects[4] = {
+                        sl_gang_1_espnow_target_gang, sl_gang_2_espnow_target_gang,
+                        sl_gang_3_espnow_target_gang, sl_gang_4_espnow_target_gang
+                      };
                       ESP_LOGI("${TAG_ESPNOW_SENDER}",
-                              "ESP-NOW message sent: button=%" PRIu8 ", MAC=%s, relay=%" PRIu8,
-                              button,
-                              id(espnow_mac_addresses)[idx].c_str(),
-                              id(espnow_relay_numbers)[idx]);
+                               "ESP-NOW sent: gang %" PRIu8 " -> MAC=%s, target gang=%s",
+                               button,
+                               mac_texts[idx]->state.c_str(),
+                               target_gang_selects[idx]->current_option().c_str());
                 on_error:
                   - lambda: |-
                       const uint8_t idx = button - 1;
+                      esphome::text::Text *const mac_texts[4] = {
+                        txt_gang_1_espnow_target_mac, txt_gang_2_espnow_target_mac,
+                        txt_gang_3_espnow_target_mac, txt_gang_4_espnow_target_mac
+                      };
                       ESP_LOGE("${TAG_ESPNOW_SENDER}",
-                              "ESP-NOW message failed: button=%" PRIu8 ", MAC=%s, relay=%" PRIu8,
-                              button,
-                              id(espnow_mac_addresses)[idx].c_str(),
-                              id(espnow_relay_numbers)[idx]);
-
-select:
-  - id: sl_espnow_send_mode
-    name: ESP-NOW Send
-    platform: template
-    options:
-      - "${ESPNOW_SEND_MODE_OFF_TEXT}"
-      - "${ESPNOW_SEND_MODE_ALWAYS_TEXT}"
-      - "${ESPNOW_SEND_MODE_FAILSAFE_TEXT}"
-    initial_option: "${ESPNOW_SEND_MODE_OFF_TEXT}"
-    optimistic: true
-    restore_value: true
-    internal: false
-    entity_category: config
-    icon: mdi:radio
-    on_value:
-      then:
-        - lambda: |-
-            ESP_LOGI("${TAG_ESPNOW_SENDER}", "ESP-NOW send mode: %s", x.c_str());
+                               "ESP-NOW send failed: gang %" PRIu8 " -> MAC=%s",
+                               button,
+                               mac_texts[idx]->state.c_str());
 ...

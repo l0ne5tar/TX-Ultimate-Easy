@@ -5,7 +5,9 @@
 #include "esphome/core/application.h"                  // For App
 #include "esphome/core/hal.h"                          // For delay()
 #include "esphome/core/log.h"
+#include <cstdio>
 #include <cstdint>
+#include <cstring>
 #include <map>
 #include <string>
 
@@ -43,6 +45,37 @@ enum class RelayLightMode : size_t {
   TopOrRight = 2,
   Both = 3,
 };
+
+/**
+ * @brief Parse a MAC address string (e.g. "AA:BB:CC:DD:EE:FF" or "aa:bb:cc:dd:ee:ff")
+ * into a 6-byte array.
+ *
+ * @param mac_str MAC address string.
+ * @param mac_bytes Array of at least 6 bytes to receive the parsed MAC.
+ * @return true if valid and non-zero, false otherwise.
+ */
+inline bool parse_mac_address(const std::string &mac_str, uint8_t *mac_bytes) {
+  if (mac_str.length() != 17) {
+    return false;
+  }
+  int values[6];
+  if (sscanf(mac_str.c_str(), "%02x:%02x:%02x:%02x:%02x:%02x",
+             &values[0], &values[1], &values[2],
+             &values[3], &values[4], &values[5]) != 6 &&
+      sscanf(mac_str.c_str(), "%02X:%02X:%02X:%02X:%02X:%02X",
+             &values[0], &values[1], &values[2],
+             &values[3], &values[4], &values[5]) != 6) {
+    return false;
+  }
+  bool all_zero = true;
+  for (int i = 0; i < 6; i++) {
+    mac_bytes[i] = static_cast<uint8_t>(values[i]);
+    if (mac_bytes[i] != 0) {
+      all_zero = false;
+    }
+  }
+  return !all_zero;
+}
 
 // Cached device name to avoid repeated lookups and string copies
 extern std::string cached_device_name;

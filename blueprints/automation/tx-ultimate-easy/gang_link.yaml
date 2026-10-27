@@ -7,6 +7,10 @@ blueprint:
     automation reload, when a panel reconnects, and whenever any linked panel
     changes state deliberately. Only the panel that was actually touched needs to
     provide local feedback; propagation through Home Assistant only updates state.
+
+    Optionally configures ESP-NOW hardware peer-to-peer binding automatically so
+    linked switches provide instant 4ms response and continue working completely
+    offline even if Home Assistant or Wi-Fi is down.
   domain: automation
   input:
     physical_entity:
@@ -29,11 +33,36 @@ blueprint:
             - switch
             - light
           multiple: true
+    auto_bind_espnow:
+      name: Automatic ESP-NOW Peer-to-Peer Binding (Optional)
+      description: >
+        When enabled, Home Assistant automatically configures the linked panels'
+        ESP-NOW runtime settings (Target MAC, Target Gang, and Send Mode) and
+        enables ESP-NOW receiving on the physical relay panel. This provides
+        hardware-level 4ms response and ensures switches keep working even if
+        Home Assistant or Wi-Fi is completely offline.
+      default: false
+      selector:
+        boolean:
+    espnow_send_mode:
+      name: ESP-NOW Send Mode
+      description: >
+        How the linked panels should communicate via ESP-NOW.
+        "API failsafe only": Uses Home Assistant normally, activates ESP-NOW only when HA/Wi-Fi is offline.
+        "Always": Sends ESP-NOW peer-to-peer on every click for instant 4ms hardware response.
+      default: "API failsafe only"
+      selector:
+        select:
+          options:
+            - "API failsafe only"
+            - "Always"
 
 # Resolved once per run so templates can reference the selected entities.
 variables:
   physical: !input physical_entity
   virtuals: !input virtual_entities
+  auto_espnow: !input auto_bind_espnow
+  espnow_mode_val: !input espnow_send_mode
 
 trigger:
   - platform: homeassistant
@@ -93,6 +122,73 @@ max: 20
 max_exceeded: warning
 
 action:
+  # Optional automatic ESP-NOW hardware binding for offline peer-to-peer control
+  - if:
+      - condition: template
+        value_template: >-
+          {{ auto_espnow | default(false)
+             and trigger.id in ['startup', 'reloaded', 'reconnect_physical', 'reconnect_virtual'] }}
+    then:
+      - variables:
+          p_dev: "{{ device_id(physical) }}"
+          p_macs: >-
+            {{ device_attr(p_dev, 'connections') | selectattr('0', 'eq', 'mac') | map(attribute='1') | list if p_dev else [] }}
+          p_mac: "{{ p_macs[0] if p_macs else '' }}"
+          p_gang_match: "{{ physical | regex_findall('(\\d+)$') }}"
+          p_gang_num: "{{ p_gang_match[0] if p_gang_match else '1' }}"
+          p_gang_str: "{{ 'Gang ' ~ p_gang_num }}"
+          p_ents: "{{ device_entities(p_dev) if p_dev else [] }}"
+          p_recv: "{{ p_ents | select('match', '.*esp_now_receive_enabled$') | list }}"
+          v_list: >-
+            {{ virtuals if (virtuals is not string and virtuals is sequence) else [virtuals] }}
+      # Ensure ESP-NOW receive is enabled on the physical relay panel
+      - if:
+          - condition: template
+            value_template: "{{ p_recv and states(p_recv[0]) == 'off' }}"
+        then:
+          - action: switch.turn_on
+            target:
+              entity_id: "{{ p_recv[0] }}"
+      # Program target MAC, target gang, and send mode on each virtual panel
+      - repeat:
+          for_each: "{{ v_list }}"
+          sequence:
+            - variables:
+                v_dev: "{{ device_id(repeat.item) }}"
+                v_ents: "{{ device_entities(v_dev) if v_dev else [] }}"
+                v_gang_match: "{{ repeat.item | regex_findall('(\\d+)$') }}"
+                v_gang_num: "{{ v_gang_match[0] if v_gang_match else '1' }}"
+                mac_ent: "{{ (v_ents | select('match', '.*gang_' ~ v_gang_num ~ '_esp_now_target_mac$') | list)[0] | default('') }}"
+                gang_ent: "{{ (v_ents | select('match', '.*gang_' ~ v_gang_num ~ '_esp_now_target_gang$') | list)[0] | default('') }}"
+                mode_ent: "{{ (v_ents | select('match', '.*gang_' ~ v_gang_num ~ '_esp_now_mode$') | list)[0] | default('') }}"
+            - if:
+                - condition: template
+                  value_template: "{{ p_mac != '' and mac_ent != '' and states(mac_ent) != p_mac }}"
+              then:
+                - action: text.set_value
+                  target:
+                    entity_id: "{{ mac_ent }}"
+                  data:
+                    value: "{{ p_mac }}"
+            - if:
+                - condition: template
+                  value_template: "{{ gang_ent != '' and states(gang_ent) != p_gang_str }}"
+              then:
+                - action: select.select_option
+                  target:
+                    entity_id: "{{ gang_ent }}"
+                  data:
+                    option: "{{ p_gang_str }}"
+            - if:
+                - condition: template
+                  value_template: "{{ mode_ent != '' and states(mode_ent) != espnow_mode_val }}"
+              then:
+                - action: select.select_option
+                  target:
+                    entity_id: "{{ mode_ent }}"
+                  data:
+                    option: "{{ espnow_mode_val }}"
+
   - variables:
       # Reconnects and initialisation always follow the physical relay.
       # A deliberate state change follows the panel that changed.

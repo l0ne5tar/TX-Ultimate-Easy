@@ -8,3 +8,6 @@ __pycache__/
 .esphome/
 
 .test/simulation/
+
+# Local developer overrides and private scripts
+.local/

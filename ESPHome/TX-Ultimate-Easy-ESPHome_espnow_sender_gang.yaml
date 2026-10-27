@@ -1,0 +1,69 @@
+####################################################################################################
+#####                              TX Ultimate Easy for ESPHome                                #####
+#####                  Repository: https://github.com/edwardtfn/TX-Ultimate-Easy               #####
+####################################################################################################
+##### Purpose: ESPHome - ESP-NOW - Sender Gang Template (included per gang 1..4)               #####
+####################################################################################################
+##### Author: jakub-k-dev - https://github.com/jakub-k-dev                                     #####
+####################################################################################################
+##### NOTE:                                                                                    #####
+##### - Make changes ONLY if absolutely necessary and you have the required knowledge.         #####
+##### - For normal system use, modifications to this file are NOT required.                    #####
+####################################################################################################
+---
+text:
+  - id: txt_gang_${gang}_espnow_target_mac
+    name: Gang ${gang} ESP-NOW Target MAC
+    platform: template
+    optimistic: true
+    restore_value: ${gang_count >= gang}
+    initial_value: ${ [espnow_target_mac_button_1, espnow_target_mac_button_2, espnow_target_mac_button_3, espnow_target_mac_button_4][idx] }
+    mode: text
+    min_length: 0
+    max_length: 17
+    internal: ${gang_count < gang}
+    entity_category: config
+    icon: mdi:radio
+    on_value:
+      then:
+        - lambda: |-
+            ESP_LOGI("${TAG_ESPNOW_SENDER}", "Gang ${gang} ESP-NOW Target MAC: %s", x.c_str());
+
+select:
+  - id: sl_gang_${gang}_espnow_target_gang
+    name: Gang ${gang} ESP-NOW Target Gang
+    platform: template
+    options:
+      - "Gang 1"
+      - "Gang 2"
+      - "Gang 3"
+      - "Gang 4"
+    initial_option: "Gang ${ [espnow_target_relay_button_1, espnow_target_relay_button_2, espnow_target_relay_button_3, espnow_target_relay_button_4][idx] }"
+    optimistic: true
+    restore_value: ${gang_count >= gang}
+    internal: ${gang_count < gang}
+    entity_category: config
+    icon: mdi:radio
+    on_value:
+      then:
+        - lambda: |-
+            ESP_LOGI("${TAG_ESPNOW_SENDER}", "Gang ${gang} ESP-NOW Target Gang: %s", x.c_str());
+
+  - id: sl_gang_${gang}_espnow_mode
+    name: Gang ${gang} ESP-NOW Mode
+    platform: template
+    options:
+      - "${ESPNOW_SEND_MODE_OFF_TEXT}"
+      - "${ESPNOW_SEND_MODE_ALWAYS_TEXT}"
+      - "${ESPNOW_SEND_MODE_FAILSAFE_TEXT}"
+    initial_option: "${ESPNOW_SEND_MODE_OFF_TEXT}"
+    optimistic: true
+    restore_value: ${gang_count >= gang}
+    internal: ${gang_count < gang}
+    entity_category: config
+    icon: mdi:radio
+    on_value:
+      then:
+        - lambda: |-
+            ESP_LOGI("${TAG_ESPNOW_SENDER}", "Gang ${gang} ESP-NOW Mode: %s", x.c_str());
+...

@@ -183,7 +183,7 @@ script:
                   case 1:  // Always
                     break;
                   case 2:  // API failsafe only
-                    if (global_api_server->is_connected_with_state_subscription() && wifi_component->is_connected()) {
+                    if (global_api_server->is_connected_with_state_subscription() && network::is_connected()) {
                       return false;
                     }
                     break;
